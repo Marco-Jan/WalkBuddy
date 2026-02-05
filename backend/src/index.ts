@@ -11,6 +11,7 @@ import { initDb } from './db';
 import messageRoutes from './routes/messages';
 import blockRoutes from './routes/blocks';
 import adminRoutes from './routes/admin';
+import contactRoutes from './routes/contact';
 import path from 'path';
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/status', statusRoutes);
 app.use('/messages', messageRoutes);
 app.use('/blocks', blockRoutes);
 app.use('/admin', adminRoutes);
+app.use('/contact', contactRoutes);
 
 
 

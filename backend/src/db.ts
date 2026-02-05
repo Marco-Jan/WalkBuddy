@@ -72,6 +72,15 @@ export async function initDb() {
       FOREIGN KEY (blockedUserId) REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS deleted_conversations (
+      userId TEXT NOT NULL,
+      otherId TEXT NOT NULL,
+      deletedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (userId, otherId),
+      FOREIGN KEY (userId) REFERENCES users(id),
+      FOREIGN KEY (otherId) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS reports (
       id TEXT PRIMARY KEY,
       reporterId TEXT NOT NULL,
@@ -81,6 +90,16 @@ export async function initDb() {
       resolved INTEGER DEFAULT 0,
       FOREIGN KEY (reporterId) REFERENCES users(id),
       FOREIGN KEY (reportedUserId) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      subject TEXT DEFAULT NULL,
+      message TEXT NOT NULL,
+      read INTEGER DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
   `);
@@ -191,6 +210,9 @@ export async function initDb() {
     await db.exec(`ALTER TABLE users ADD COLUMN emailVerificationToken TEXT DEFAULT NULL`);
     console.log('✅ Migration: emailVerificationToken-Spalte zu users hinzugefügt');
   }
+
+
+
 
   console.log('✅ SQLite DB bereit:', dbPath);
 }

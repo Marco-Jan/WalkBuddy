@@ -20,7 +20,10 @@
       "Bash(python3:*)",
       "Bash(taskkill:*)",
       "Bash(npx tsc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(TASKLIST /FI \"IMAGENAME eq node.exe\")",
+      "Bash(ps:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

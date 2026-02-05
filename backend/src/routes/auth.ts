@@ -6,11 +6,19 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: (Number(process.env.SMTP_PORT) || 587) === 465,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+const MAIL_FROM = process.env.SMTP_FROM || 'noreply@walkbuddy.de';
+const APP_URL = process.env.APP_URL || 'http://localhost:3001';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 
 const router = Router();
@@ -102,7 +110,7 @@ router.post('/register', async (req, res) => {
         dogName,
         email,
         hashedPassword,
-        accessible ? 1 : 0,
+        accessible ?? 1,
         need_his_time ? 1 : 0,
         visibleToGender ?? 'all',
         publicKey ?? null,
@@ -118,8 +126,8 @@ router.post('/register', async (req, res) => {
     // Verifizierungs-Email senden
     const verifyLink = `${BACKEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
     try {
-      await resend.emails.send({
-        from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+      await transporter.sendMail({
+        from: MAIL_FROM,
         to: email,
         subject: 'WalkBuddy – Bitte bestätige deine Email-Adresse',
         html: `
@@ -167,10 +175,17 @@ router.post('/login', async (req, res) => {
 
     req.session.userId = user.id;
 
-    return res.json({
-      success: true,
-      user: sanitizeUser(user),
-      encryptedPrivateKey: user.encryptedPrivateKey || null
+    // Express 5: Session explizit speichern, damit Set-Cookie Header gesetzt wird
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Serverfehler' });
+      }
+      return res.json({
+        success: true,
+        user: sanitizeUser(user),
+        encryptedPrivateKey: user.encryptedPrivateKey || null
+      });
     });
   } catch (e) {
     console.error(e);
@@ -227,8 +242,8 @@ router.post('/resend-verification', async (req, res) => {
 
       const verifyLink = `${BACKEND_URL}/auth/verify-email?token=${newToken}`;
       try {
-        await resend.emails.send({
-          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+        await transporter.sendMail({
+          from: MAIL_FROM,
           to: email,
           subject: 'WalkBuddy – Bitte bestätige deine Email-Adresse',
           html: `

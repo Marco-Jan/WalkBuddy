@@ -103,7 +103,14 @@ router.get('/with/:userId', async (req, res) => {
       return res.status(403).json({ error: 'Zugriff verweigert' });
     }
 
-    // Gibt es überhaupt eine Beziehung?
+    // deleted_conversations: Zeitpunkt der letzten Löschung holen
+    const delRow = await db.get(
+      `SELECT deletedAt FROM deleted_conversations WHERE userId = ? AND otherId = ?`,
+      [me, other]
+    );
+    const deletedAt = delRow?.deletedAt || '1970-01-01 00:00:00';
+
+    // Gibt es überhaupt eine Beziehung (nach evtl. Löschung)?
     const relation = await db.get(
       `
       SELECT 1
@@ -111,16 +118,17 @@ router.get('/with/:userId', async (req, res) => {
       WHERE active = 1
         AND ((senderId = ? AND receiverId = ?)
          OR (senderId = ? AND receiverId = ?))
+        AND datetime(createdAt) > datetime(?)
       LIMIT 1
       `,
-      [me, other, other, me]
+      [me, other, other, me, deletedAt]
     );
 
     if (!relation) {
       return res.status(403).json({ error: 'Kein Zugriff auf diesen Chat' });
     }
 
-    // Nachrichten laden
+    // Nachrichten laden (nur nach evtl. Löschung)
     const messages = await db.all(
       `
       SELECT id, senderId, receiverId, content, createdAt, iv
@@ -128,9 +136,10 @@ router.get('/with/:userId', async (req, res) => {
       WHERE active = 1
         AND ((senderId = ? AND receiverId = ?)
          OR (senderId = ? AND receiverId = ?))
+        AND datetime(createdAt) > datetime(?)
       ORDER BY createdAt ASC
       `,
-      [me, other, other, me]
+      [me, other, other, me, deletedAt]
     );
 
     // Public Key des Gesprächspartners für E2EE-Entschlüsselung
@@ -191,12 +200,15 @@ router.get('/unread-count', async (req, res) => {
       FROM conv
       LEFT JOIN conversation_reads cr
         ON cr.userId = ? AND cr.otherId = conv.otherId
+      LEFT JOIN deleted_conversations dc
+        ON dc.userId = ? AND dc.otherId = conv.otherId
       WHERE conv.lastIncomingAt IS NOT NULL
         AND datetime(conv.lastIncomingAt) > datetime(COALESCE(cr.lastSeenAt, '1970-01-01 00:00:00'))
         AND conv.otherId NOT IN (SELECT blockedUserId FROM blocks WHERE userId = ?)
         AND conv.otherId NOT IN (SELECT userId FROM blocks WHERE blockedUserId = ?)
+        AND (dc.deletedAt IS NULL OR datetime(conv.lastIncomingAt) > datetime(dc.deletedAt))
       `,
-      [me, me, me, me, me, me, me]
+      [me, me, me, me, me, me, me, me]
     );
 
     res.json({ count: row?.count ?? 0 });
@@ -313,14 +325,68 @@ router.get('/inbox', async (req, res) => {
       JOIN users u ON u.id = l.otherId
       LEFT JOIN conversation_reads cr
         ON cr.userId = ? AND cr.otherId = l.otherId
+      LEFT JOIN deleted_conversations dc
+        ON dc.userId = ? AND dc.otherId = l.otherId
       WHERE l.otherId NOT IN (SELECT blockedUserId FROM blocks WHERE userId = ?)
         AND l.otherId NOT IN (SELECT userId FROM blocks WHERE blockedUserId = ?)
+        AND (dc.deletedAt IS NULL OR datetime(l.createdAt) > datetime(dc.deletedAt))
       ORDER BY datetime(l.createdAt) DESC
       `,
-      [me, me, me, me, me, me, me, me, me, me]
+      [me, me, me, me, me, me, me, me, me, me, me]
     );
 
     res.json({ items: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Ganzen Chat löschen (per-user soft delete)
+router.delete('/conversation/:otherId', async (req, res) => {
+  try {
+    const me = req.session.userId;
+    if (!me) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const otherId = req.params.otherId;
+    const db = await dbPromise;
+
+    await db.run(
+      `INSERT INTO deleted_conversations (userId, otherId, deletedAt)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(userId, otherId)
+       DO UPDATE SET deletedAt = CURRENT_TIMESTAMP`,
+      [me, otherId]
+    );
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Eigene Nachricht löschen (soft delete)
+router.delete('/:id', async (req, res) => {
+  try {
+    const me = req.session.userId;
+    if (!me) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const db = await dbPromise;
+    const msg = await db.get(
+      `SELECT id, senderId FROM messages WHERE id = ? AND active = 1`,
+      [req.params.id]
+    );
+
+    if (!msg) return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+
+    if (msg.senderId !== me) {
+      return res.status(403).json({ error: 'Du kannst nur eigene Nachrichten löschen' });
+    }
+
+    await db.run(`UPDATE messages SET active = 0 WHERE id = ?`, [req.params.id]);
+
+    res.json({ success: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Serverfehler' });

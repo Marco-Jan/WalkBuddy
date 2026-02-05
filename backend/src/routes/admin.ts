@@ -26,11 +26,13 @@ router.get('/stats', requireAdmin, async (_req, res) => {
     const userCount = await db.get(`SELECT COUNT(*) as count FROM users`);
     const messageCount = await db.get(`SELECT COUNT(*) as count FROM messages`);
     const openReports = await db.get(`SELECT COUNT(*) as count FROM reports WHERE resolved = 0`);
+    const unreadContact = await db.get(`SELECT COUNT(*) as count FROM contact_messages WHERE read = 0`);
 
     res.json({
       users: userCount?.count || 0,
       messages: messageCount?.count || 0,
       openReports: openReports?.count || 0,
+      unreadContact: unreadContact?.count || 0,
     });
   } catch (e) {
     console.error(e);
@@ -132,5 +134,85 @@ router.delete('/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
+
+// Kontaktanfragen auflisten
+router.get('/contact', requireAdmin, async (_req, res) => {
+  try {
+    const db = await dbPromise;
+
+    const messages = await db.all(`
+      SELECT id, name, email, subject, message, read, createdAt
+      FROM contact_messages
+      ORDER BY read ASC, createdAt DESC
+    `);
+
+    res.json({ items: messages });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Kontaktanfrage als gelesen markieren
+router.put('/contact/:id/read', requireAdmin, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    await db.run(`UPDATE contact_messages SET read = 1 WHERE id = ?`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Kontaktanfrage löschen
+router.delete('/contact/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    await db.run(`DELETE FROM contact_messages WHERE id = ?`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Log: Chronologische Übersicht aller Aktivitäten
+router.get('/log', requireAdmin, async (_req, res) => {
+  try {
+    const db = await dbPromise;
+
+    const log = await db.all(`
+      SELECT id, 'contact' as type, name as actor, subject as detail, message as extra, createdAt
+      FROM contact_messages
+      UNION ALL
+      SELECT r.id, 'report' as type,
+             reporter.name || ' → ' || reported.name as actor,
+             r.reason as detail,
+             NULL as extra,
+             r.createdAt
+      FROM reports r
+      JOIN users reporter ON reporter.id = r.reporterId
+      JOIN users reported ON reported.id = r.reportedUserId
+      UNION ALL
+      SELECT m.id, 'message' as type,
+             sender.name || ' → ' || receiver.name as actor,
+             NULL as detail,
+             NULL as extra,
+             m.createdAt
+      FROM messages m
+      JOIN users sender ON sender.id = m.senderId
+      JOIN users receiver ON receiver.id = m.receiverId
+      WHERE m.active = 1
+      ORDER BY createdAt DESC
+      LIMIT 100
+    `);
+
+    res.json({ items: log });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
 
 export default router;
