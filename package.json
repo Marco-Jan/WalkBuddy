@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "connect-sqlite3": "^0.9.16",
+    "express-session": "^1.19.0"
+  }
+}
