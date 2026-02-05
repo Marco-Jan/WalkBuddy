@@ -23,7 +23,9 @@
       "Bash(ls:*)",
       "Bash(TASKLIST /FI \"IMAGENAME eq node.exe\")",
       "Bash(ps:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)"
     ]
   }
 }
