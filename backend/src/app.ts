@@ -8,6 +8,7 @@ import messageRoutes from './routes/messages';
 import blockRoutes from './routes/blocks';
 import adminRoutes from './routes/admin';
 import path from 'path';
+import { authLimiter, messageLimiter, generalLimiter } from './middleware/rateLimiter';
 
 export function createApp() {
 
@@ -40,9 +41,10 @@ export function createApp() {
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 
-  app.use('/auth', authRoutes);
+  app.use(generalLimiter);
+  app.use('/auth', authLimiter, authRoutes);
   app.use('/status', statusRoutes);
-  app.use('/messages', messageRoutes);
+  app.use('/messages', messageLimiter, messageRoutes);
   app.use('/blocks', blockRoutes);
   app.use('/admin', adminRoutes);
 

@@ -13,3 +13,5 @@ data/
 # misc
 .DS_Store
 npm-debug.log*
+
+TODO.md

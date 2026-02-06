@@ -211,8 +211,25 @@ export async function initDb() {
     console.log('✅ Migration: emailVerificationToken-Spalte zu users hinzugefügt');
   }
 
+  // Migration: passwordResetToken-Spalte für users
+  const resetCols = await db.all(`PRAGMA table_info(users)`);
+  if (!resetCols.some((c: any) => c.name === 'passwordResetToken')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN passwordResetToken TEXT DEFAULT NULL`);
+    console.log('✅ Migration: passwordResetToken-Spalte zu users hinzugefügt');
+  }
 
+  // Migration: passwordResetExpiry-Spalte für users
+  if (!resetCols.some((c: any) => c.name === 'passwordResetExpiry')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN passwordResetExpiry TEXT DEFAULT NULL`);
+    console.log('✅ Migration: passwordResetExpiry-Spalte zu users hinzugefügt');
+  }
 
+  // Migration: hasSeenOnboarding-Spalte für users
+  const onboardingCols = await db.all(`PRAGMA table_info(users)`);
+  if (!onboardingCols.some((c: any) => c.name === 'hasSeenOnboarding')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN hasSeenOnboarding INTEGER DEFAULT 0`);
+    console.log('✅ Migration: hasSeenOnboarding-Spalte zu users hinzugefügt');
+  }
 
   console.log('✅ SQLite DB bereit:', dbPath);
 }

@@ -269,6 +269,91 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// Passwort vergessen
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.json({ success: true });
+
+    const db = await dbPromise;
+    const user = await db.get(
+      `SELECT id FROM users WHERE email = ? AND aktiv = 1`,
+      [email]
+    );
+
+    if (user) {
+      const token = crypto.randomUUID();
+      const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 Stunde
+
+      await db.run(
+        `UPDATE users SET passwordResetToken = ?, passwordResetExpiry = ? WHERE id = ?`,
+        [token, expiry, user.id]
+      );
+
+      const resetLink = `${APP_URL}/reset-password?token=${token}`;
+      try {
+        await transporter.sendMail({
+          from: MAIL_FROM,
+          to: email,
+          subject: 'WalkBuddy – Passwort zurücksetzen',
+          html: `
+            <h2>Passwort zurücksetzen</h2>
+            <p>Du hast angefordert, dein Passwort zurückzusetzen.</p>
+            <p>Klicke auf den folgenden Link, um ein neues Passwort zu setzen:</p>
+            <p><a href="${resetLink}">${resetLink}</a></p>
+            <p>Der Link ist 1 Stunde gültig.</p>
+            <p>Falls du kein neues Passwort angefordert hast, kannst du diese Email ignorieren.</p>
+          `,
+        });
+      } catch (emailErr) {
+        console.error('Password-Reset Email-Versand fehlgeschlagen:', emailErr);
+      }
+    }
+
+    // Immer success zurückgeben (Security: keine Info ob Email existiert)
+    return res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    return res.json({ success: true });
+  }
+});
+
+// Passwort zurücksetzen
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token und Passwort sind erforderlich' });
+    }
+
+    const db = await dbPromise;
+    const user = await db.get(
+      `SELECT id, passwordResetExpiry FROM users WHERE passwordResetToken = ? AND aktiv = 1`,
+      [token]
+    );
+
+    if (!user) {
+      return res.status(400).json({ error: 'Ungültiger oder abgelaufener Link' });
+    }
+
+    // Prüfen ob Token abgelaufen
+    if (!user.passwordResetExpiry || new Date(user.passwordResetExpiry) < new Date()) {
+      return res.status(400).json({ error: 'Ungültiger oder abgelaufener Link' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await db.run(
+      `UPDATE users SET password = ?, passwordResetToken = NULL, passwordResetExpiry = NULL WHERE id = ?`,
+      [hashedPassword, user.id]
+    );
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
 // Logout
 router.post('/logout', (req, res) => {
   req.session.destroy(err => {
@@ -291,7 +376,7 @@ router.get('/me', async (req, res) => {
     const user = await db.get(
       `SELECT id, name, email, gender, humanGender, age, breed, neutered, description,
               city, area, postalCode, dogName, accessible, need_his_time, available,
-              visibleToGender, publicKey, profilePic, role, aktiv
+              visibleToGender, publicKey, profilePic, role, aktiv, hasSeenOnboarding
        FROM users WHERE id = ? AND aktiv = 1`,
       [userId]
     );
@@ -378,6 +463,7 @@ router.put('/me', async (req, res) => {
       visibleToGender,
       neutered,
       description,
+      hasSeenOnboarding,
     } = req.body;
 
     if (!name || !gender || !dogName) {
@@ -391,7 +477,8 @@ router.put('/me', async (req, res) => {
        SET name = ?, gender = ?, humanGender = ?, age = ?, breed = ?,
            city = ?, area = ?, postalCode = ?, dogName = ?,
            accessible = ?, need_his_time = ?, visibleToGender = ?,
-           neutered = ?, description = ?
+           neutered = ?, description = ?,
+           hasSeenOnboarding = COALESCE(?, hasSeenOnboarding)
        WHERE id = ?`,
       name,
       gender,
@@ -407,18 +494,48 @@ router.put('/me', async (req, res) => {
       visibleToGender || 'all',
       neutered || null,
       description || null,
+      typeof hasSeenOnboarding === 'number' ? hasSeenOnboarding : null,
       userId
     );
 
     const updatedUser = await db.get(
       `SELECT id, name, email, gender, humanGender, age, breed, neutered, description,
               city, area, postalCode, dogName, accessible, need_his_time, available,
-              visibleToGender, profilePic, role, aktiv
+              visibleToGender, profilePic, role, aktiv, hasSeenOnboarding
        FROM users WHERE id = ? AND aktiv = 1`,
       [userId]
     );
 
     return res.json({ success: true, user: updatedUser });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Account löschen (Soft-Delete)
+router.delete('/me', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Passwort ist erforderlich' });
+
+    const db = await dbPromise;
+    const user = await db.get(`SELECT password FROM users WHERE id = ? AND aktiv = 1`, [userId]);
+    if (!user) return res.status(404).json({ error: 'User nicht gefunden' });
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ error: 'Falsches Passwort' });
+
+    await db.run(`UPDATE users SET aktiv = 0, available = 0 WHERE id = ?`, [userId]);
+
+    req.session.destroy((err) => {
+      if (err) console.error('Session destroy error:', err);
+      res.clearCookie('connect.sid');
+      return res.json({ success: true });
+    });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Serverfehler' });

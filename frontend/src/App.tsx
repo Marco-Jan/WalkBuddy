@@ -6,6 +6,8 @@ import { createToaster } from "@chakra-ui/react";
 
 import RegisterForm from './components/RegisterForm';
 import LoginForm from './components/LoginForm';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import UserList from './components/UserList';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
@@ -20,8 +22,10 @@ import ImpressumPage from './pages/ImpressumPage';
 import ContactPage from './pages/ContactPage';
 import Footer from './components/Footer';
 
+import OnboardingModal from './components/OnboardingModal';
+
 import { User } from './types/user';
-import { getMe, logout } from './api/api';
+import { getMe, logout, updateMe } from './api/api';
 import { clearKeyStore, loadPrivateKey } from './crypto';
 
 
@@ -36,6 +40,7 @@ export const toaster = createToaster({
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -53,6 +58,7 @@ const App: React.FC = () => {
         }
 
         setUser(me);
+        if (!me.hasSeenOnboarding) setShowOnboarding(true);
       } catch {
         setUser(null);
       } finally {
@@ -71,6 +77,42 @@ const App: React.FC = () => {
     setUser(null);
   };
 
+  const handleLogin = (u: User) => {
+    setUser(u);
+    if (!u.hasSeenOnboarding) setShowOnboarding(true);
+  };
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    if (user) {
+      try {
+        await updateMe({
+          name: user.name,
+          gender: user.gender,
+          humanGender: user.humanGender,
+          age: user.age,
+          breed: user.breed,
+          dogName: user.dogName,
+          accessible: !!user.accessible,
+          need_his_time: !!user.need_his_time,
+          visibleToGender: user.visibleToGender,
+          neutered: user.neutered,
+          description: user.description,
+          hasSeenOnboarding: 1,
+        } as any);
+        setUser({ ...user, hasSeenOnboarding: 1 });
+      } catch {
+        // Ignore — onboarding will show again next time
+      }
+    }
+  };
+
+  const handleAccountDeleted = async () => {
+    await clearKeyStore();
+    localStorage.clear();
+    setUser(null);
+  };
+
 
   if (authLoading)
     return (
@@ -82,14 +124,17 @@ const App: React.FC = () => {
 
   return (
     <Router>
+      {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
       <Flex minH="100vh" bg="sand.100" direction="column">
         <Header user={user} onLogout={handleLogout} />
 
         <Box flex="1" maxW="1200px" mx="auto" w="100%" px={{ base: '3', sm: '4', md: '6' }} py={{ base: '4', md: '6' }}>
           <Routes>
-            <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginForm onLogin={setUser} />} />
+            <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginForm onLogin={handleLogin} />} />
 
                 <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterForm />} />
+            <Route path="/forgot-password" element={user ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
+            <Route path="/reset-password" element={user ? <Navigate to="/" replace /> : <ResetPasswordPage />} />
 
             <Route
               path="/"
@@ -99,7 +144,7 @@ const App: React.FC = () => {
                     <UserList user={user} />
                   </ProtectedRoute>
                 ) : (
-                  <LoginForm onLogin={setUser} />
+                  <LoginForm onLogin={handleLogin} />
                 )
               }
             />
@@ -126,7 +171,7 @@ const App: React.FC = () => {
               path="/account"
               element={
                 <ProtectedRoute user={user}>
-                  <AccountCard user={user!} onUpdate={setUser} />
+                  <AccountCard user={user!} onUpdate={setUser} onAccountDeleted={handleAccountDeleted} />
                 </ProtectedRoute>
               }
             />

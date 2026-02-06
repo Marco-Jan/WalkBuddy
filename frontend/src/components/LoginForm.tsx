@@ -27,10 +27,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [showResend, setShowResend] = useState(false);
   const [resendSent, setResendSent] = useState(false);
 
+  const [resetBanner, setResetBanner] = useState(false);
+
   useEffect(() => {
     const verified = searchParams.get('verified');
     if (verified === '1') setVerifiedBanner('success');
     else if (verified === '0') setVerifiedBanner('error');
+
+    if (searchParams.get('reset') === '1') setResetBanner(true);
   }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -123,6 +127,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             </Text>
           </Box>
         )}
+        {resetBanner && (
+          <Box bg="green.100" border="1px solid" borderColor="green.300" borderRadius="md" p="3" mb="4" textAlign="center">
+            <Text color="green.700" fontSize="sm" fontWeight="600">
+              Passwort wurde geändert! Du kannst dich jetzt einloggen.
+            </Text>
+          </Box>
+        )}
 
         <Text fontSize="sm" color="bark.400" mb="4" textAlign="center">
           Noch keinen Account?{' '}
@@ -146,7 +157,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               size="lg"
             />
           </Box>
-          <Box mb="5">
+          <Box mb="2">
             <Input
               type="password"
               placeholder="Passwort"
@@ -160,6 +171,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               size="lg"
             />
           </Box>
+          <Text fontSize="xs" color="bark.400" mb="4" textAlign="right">
+            <Box as={RouterLink as any} {...{to: "/forgot-password"} as any} color="ember.500" fontWeight="600">
+              Passwort vergessen?
+            </Box>
+          </Text>
           <Button
             type="submit"
             bg="forest.500"

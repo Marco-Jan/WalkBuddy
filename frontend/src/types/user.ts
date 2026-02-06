@@ -20,4 +20,5 @@ export interface User {
   profilePic?: string | null;
   role?: 'user' | 'admin';
   aktiv: number;
+  hasSeenOnboarding?: number;
 }

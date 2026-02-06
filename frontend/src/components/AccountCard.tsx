@@ -4,16 +4,17 @@ import { FaSave, FaPaw } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
 import { FaCamera } from 'react-icons/fa';
 import { User } from '../types/user';
-import { getMe, updateMe, setMyStatus, getBlockedUsers, unblockUser, uploadProfilePic, getProfilePicUrl } from '../api/api';
+import { getMe, updateMe, setMyStatus, getBlockedUsers, unblockUser, uploadProfilePic, getProfilePicUrl, deleteMyAccount } from '../api/api';
 
 
 
 interface Props {
   user: User;
   onUpdate: (user: User) => void;
+  onAccountDeleted?: () => void;
 }
 
-const AccountCard: React.FC<Props> = ({ user, onUpdate }) => {
+const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
@@ -38,6 +39,10 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate }) => {
   const [unblocking, setUnblocking] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const isAvailable = useMemo(() => !!user.available, [user.available]);
   const [visibleToGender, setVisibleToGender] = useState(user.visibleToGender ?? 'all');
@@ -172,6 +177,20 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate }) => {
       setMessage(err.response?.data?.error || 'Fehler beim Entblockieren');
     } finally {
       setUnblocking(null);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) return;
+    setDeletingAccount(true);
+    setDeleteError('');
+    try {
+      await deleteMyAccount(deletePassword);
+      if (onAccountDeleted) onAccountDeleted();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || 'Fehler beim Löschen');
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -602,6 +621,68 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate }) => {
             ))}
           </Box>
         )}
+
+        {/* Account löschen */}
+        <Box mt="6" pt="5" borderTop="1px solid" borderColor="sand.300">
+          <Text fontWeight="700" color="ember.500" mb="3">
+            Account löschen
+          </Text>
+          {!showDeleteDialog ? (
+            <Button
+              onClick={() => setShowDeleteDialog(true)}
+              bg="ember.500"
+              color="white"
+              _hover={{ bg: 'ember.600' }}
+              size="sm"
+              fontWeight="700"
+            >
+              Account löschen
+            </Button>
+          ) : (
+            <Box bg="sand.100" borderRadius="lg" p="4">
+              <Text fontSize="sm" color="bark.500" mb="3">
+                Bist du sicher? Dein Account wird deaktiviert und du kannst dich nicht mehr einloggen.
+                Gib dein Passwort zur Bestätigung ein:
+              </Text>
+              <Input
+                type="password"
+                placeholder="Passwort"
+                value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)}
+                mb="3"
+                {...inputProps}
+              />
+              {deleteError && (
+                <Text fontSize="sm" color="ember.500" mb="2" fontWeight="600">
+                  {deleteError}
+                </Text>
+              )}
+              <Flex gap="2">
+                <Button
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount || !deletePassword}
+                  bg="ember.500"
+                  color="white"
+                  _hover={{ bg: 'ember.600' }}
+                  size="sm"
+                  fontWeight="700"
+                >
+                  {deletingAccount ? 'Wird gelöscht…' : 'Endgültig löschen'}
+                </Button>
+                <Button
+                  onClick={() => { setShowDeleteDialog(false); setDeletePassword(''); setDeleteError(''); }}
+                  variant="outline"
+                  borderColor="bark.300"
+                  color="bark.400"
+                  size="sm"
+                  fontWeight="600"
+                >
+                  Abbrechen
+                </Button>
+              </Flex>
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   );

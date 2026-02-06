@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nUmgebungs-basierte Config: lokal + Server aus einem Repo\n\n- Frontend: VITE_API_URL → REACT_APP_API_URL \\(CRA-kompatibel\\)\n- Frontend: .env.development \\(localhost\\) + .env.production \\(walk-buddy.app\\)\n- Frontend: vite-env.d.ts entfernt \\(falsch für CRA\\)\n- Backend: Cookie secure/sameSite dynamisch je nach NODE_ENV\n- Backend: CORS-Default auf localhost:3001 für lokale Entwicklung\n- Backend: .env.example aktualisiert \\(SMTP statt Resend\\)\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(npm rebuild:*)",
+      "Bash(node -e:*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

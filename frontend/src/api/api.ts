@@ -120,6 +120,11 @@ export const updateMe = async (
   return res.data;
 };
 
+export const deleteMyAccount = async (password: string) => {
+  const res = await axios.delete(`${BASE_URL}/auth/me`, { data: { password } });
+  return res.data;
+};
+
 export const logout = async () => {
   const res = await axios.post(`${BASE_URL}/auth/logout`);
   return res.data;
@@ -216,5 +221,17 @@ export const sendContactMessage = async (data: { name: string; email: string; su
 // Email-Verifizierung erneut senden
 export const resendVerification = async (email: string) => {
   const res = await axios.post(`${BASE_URL}/auth/resend-verification`, { email });
+  return res.data;
+};
+
+// Passwort vergessen
+export const forgotPassword = async (email: string) => {
+  const res = await axios.post(`${BASE_URL}/auth/forgot-password`, { email });
+  return res.data;
+};
+
+// Passwort zurücksetzen
+export const resetPassword = async (token: string, password: string) => {
+  const res = await axios.post(`${BASE_URL}/auth/reset-password`, { token, password });
   return res.data;
 };
