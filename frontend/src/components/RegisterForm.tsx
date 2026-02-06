@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Flex, Heading, Input, Text } from '@chakra-ui/react';
 import { FaPaw } from 'react-icons/fa';
+import { getApiUrl } from '../api/api';
 import {
   generateKeyPair,
   exportPublicKey,
@@ -31,7 +32,7 @@ const RegisterForm: React.FC = () => {
       const pubKeyBase64 = await exportPublicKey(keyPair.publicKey);
       const encPrivKey = await encryptPrivateKey(keyPair.privateKey, password);
 
-      await axios.post('/api/auth/register', {
+      await axios.post(`${getApiUrl()}/auth/register`, {
         name,
         dogName,
         humanGender,

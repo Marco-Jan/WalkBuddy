@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-d
 import { Box, Button, Flex, Heading, Input, Text } from '@chakra-ui/react';
 import { FaPaw } from 'react-icons/fa';
 import { User } from '../types/user';
-import { uploadKeys, resendVerification } from '../api/api';
+import { uploadKeys, resendVerification, getApiUrl } from '../api/api';
 import {
   generateKeyPair,
   exportPublicKey,
@@ -36,7 +36,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await axios.post('/api/auth/login', {
+      const res = await axios.post(`${getApiUrl()}/auth/login`, {
         email,
         password
       });

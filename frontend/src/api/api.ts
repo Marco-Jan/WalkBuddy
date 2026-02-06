@@ -5,6 +5,8 @@ axios.defaults.withCredentials = true;
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
+export const getApiUrl = () => BASE_URL;
+
 
 export const getAvailableUsers = async (): Promise<User[]> => {
   const res = await axios.get(`${BASE_URL}/status/available`);
