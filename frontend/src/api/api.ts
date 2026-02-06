@@ -3,7 +3,8 @@ import { User } from '../types/user';
 
 axios.defaults.withCredentials = true;
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://walk-buddy.app/api';
+
 
 export const getAvailableUsers = async (): Promise<User[]> => {
   const res = await axios.get(`${BASE_URL}/status/available`);

@@ -10,26 +10,31 @@ import adminRoutes from './routes/admin';
 import path from 'path';
 
 export function createApp() {
+
   const app = express();
 
   app.use(cors({
-    origin: 'http://localhost:3001',
+    origin: process.env.CORS_ORIGIN || 'https://walk-buddy.app',
     credentials: true,
   }));
+  app.set('trust proxy', 1);
+
 
   app.use(
-    session({
-      secret: 'test-secret',
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: false,
-        maxAge: 24 * 60 * 60 * 1000,
-      },
-    })
-  );
+  session({
+    secret: process.env.SESSION_SECRET!,  
+    resave: false,
+    saveUninitialized: false,
+    proxy: true,                           
+    cookie: {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
 
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));

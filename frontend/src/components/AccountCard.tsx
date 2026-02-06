@@ -424,9 +424,9 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate }) => {
                   fontSize: '14px',
                 }}
               >
-                <option value="">Keine Angabe</option>
-                <option value="neutered">Kastriert</option>
-                <option value="intact">Nicht kastriert</option>
+                
+                <option value="neutered">Neutral</option>
+                <option value="intact">Nicht neutral</option>
               </select>
             </Box>
 

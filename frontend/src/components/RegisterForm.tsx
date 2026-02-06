@@ -31,7 +31,7 @@ const RegisterForm: React.FC = () => {
       const pubKeyBase64 = await exportPublicKey(keyPair.publicKey);
       const encPrivKey = await encryptPrivateKey(keyPair.privateKey, password);
 
-      await axios.post('http://localhost:3000/auth/register', {
+      await axios.post('/api/auth/register', {
         name,
         dogName,
         humanGender,
@@ -208,7 +208,7 @@ const RegisterForm: React.FC = () => {
                   fontSize: '14px',
                 }}
               >
-                <option value="">Neutral</option>
+                
                 <option value="neutered">Neutral</option>
                 <option value="intact">Nicht neutral</option>
               </select>

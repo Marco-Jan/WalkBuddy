@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 
 import { createToaster } from "@chakra-ui/react";
@@ -87,8 +87,9 @@ const App: React.FC = () => {
 
         <Box flex="1" maxW="1200px" mx="auto" w="100%" px={{ base: '3', sm: '4', md: '6' }} py={{ base: '4', md: '6' }}>
           <Routes>
-            <Route path="/login" element={<LoginForm onLogin={setUser} />} />
-            <Route path="/register" element={<RegisterForm />} />
+            <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginForm onLogin={setUser} />} />
+
+                <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterForm />} />
 
             <Route
               path="/"

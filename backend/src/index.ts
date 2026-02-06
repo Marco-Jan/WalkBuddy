@@ -31,6 +31,9 @@ app.use(cors({
   credentials: true,
 }));
 
+app.set('trust proxy', 1);
+
+
 app.use(
   session({
     store: new SQLiteStore({
@@ -41,15 +44,17 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: true,
 
     cookie: {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
+      sameSite: 'none',
+      secure: true,
       maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );
+
 
 app.use(express.json());
 

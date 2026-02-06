@@ -124,7 +124,10 @@ router.post('/register', async (req, res) => {
     );
 
     // Verifizierungs-Email senden
+    // const verifyLink = `${BACKEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
     const verifyLink = `${BACKEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+
+
     try {
       await transporter.sendMail({
         from: MAIL_FROM,
