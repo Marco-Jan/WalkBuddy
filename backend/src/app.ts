@@ -12,9 +12,10 @@ import path from 'path';
 export function createApp() {
 
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production';
 
   app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'https://walk-buddy.app',
+    origin: process.env.CORS_ORIGIN || (isProduction ? 'https://walk-buddy.app' : 'http://localhost:3001'),
     credentials: true,
   }));
   app.set('trust proxy', 1);
@@ -22,14 +23,14 @@ export function createApp() {
 
   app.use(
   session({
-    secret: process.env.SESSION_SECRET!,  
+    secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
-    proxy: true,                           
+    proxy: true,
     cookie: {
       httpOnly: true,
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
       maxAge: 24 * 60 * 60 * 1000,
     },
   })

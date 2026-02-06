@@ -27,7 +27,7 @@ if (!process.env.SESSION_SECRET) {
 }
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
   credentials: true,
 }));
 
@@ -48,8 +48,8 @@ app.use(
 
     cookie: {
       httpOnly: true,
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
       maxAge: 24 * 60 * 60 * 1000,
     },
   })
