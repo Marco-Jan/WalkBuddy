@@ -35,18 +35,18 @@ router.post('/send', async (req, res) => {
 
     // Empfänger prüfen (muss verfügbar sein)
     const receiver = await db.get(
-    `SELECT gender, available, visibleToGender FROM users WHERE id = ?`,
+    `SELECT humanGender, available, visibleToGender FROM users WHERE id = ?`,
     [receiverId]
     );
 
     if (!receiver || receiver.available !== 1) {
     return res.status(403).json({ error: 'User nicht verfügbar' });
     }
-    const meRow = await db.get(`SELECT gender FROM users WHERE id = ?`, [senderId]);
+    const meRow = await db.get(`SELECT humanGender FROM users WHERE id = ?`, [senderId]);
 
     if (
         receiver.visibleToGender !== 'all' &&
-        receiver.visibleToGender !== meRow.gender
+        receiver.visibleToGender !== meRow.humanGender
         ) {
         return res.status(403).json({ error: 'User erlaubt keine Nachrichten von dir' });
         }
@@ -148,7 +148,17 @@ router.get('/with/:userId', async (req, res) => {
       [other]
     );
 
-    res.json({ messages, otherPublicKey: otherKeyRow?.publicKey || null });
+    // Wann hat der Partner zuletzt unsere Konversation gelesen?
+    const partnerReadRow = await db.get(
+      `SELECT lastSeenAt FROM conversation_reads WHERE userId = ? AND otherId = ?`,
+      [other, me]
+    );
+
+    res.json({
+      messages,
+      otherPublicKey: otherKeyRow?.publicKey || null,
+      partnerLastSeenAt: partnerReadRow?.lastSeenAt || null,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Serverfehler' });

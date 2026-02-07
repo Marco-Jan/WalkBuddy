@@ -6,7 +6,7 @@ import { FaPaw, FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus } from 'react-icon
 import { FaCog } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
 import { FaDog } from 'react-icons/fa';
-import { getUnreadCount } from '../api/api';
+import { getUnreadCount, getAdminStats } from '../api/api';
 import { User } from '../types/user';
 
 interface Props {
@@ -41,6 +41,7 @@ const NavLink: React.FC<{
 
 const Header: React.FC<Props> = ({ user, onLogout }) => {
   const [hasUnread, setHasUnread] = useState(false);
+  const [hasAdminNotifications, setHasAdminNotifications] = useState(false);
   const location = useLocation();
 
   const onMessagesPage =
@@ -66,6 +67,27 @@ const Header: React.FC<Props> = ({ user, onLogout }) => {
     const timer = setInterval(load, 5000);
     return () => clearInterval(timer);
   }, [user, onMessagesPage]);
+
+  // Admin notification polling
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      setHasAdminNotifications(false);
+      return;
+    }
+
+    const loadAdmin = async () => {
+      try {
+        const stats = await getAdminStats();
+        setHasAdminNotifications(stats.openReports > 0 || stats.unreadContact > 0);
+      } catch {
+        setHasAdminNotifications(false);
+      }
+    };
+
+    loadAdmin();
+    const timer = setInterval(loadAdmin, 30000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   return (
     <Box
@@ -121,7 +143,7 @@ const Header: React.FC<Props> = ({ user, onLogout }) => {
               <NavLink to="/account" icon={<FaUser />} label="Account" />
 
               {user.role === 'admin' && (
-                <NavLink to="/admin" icon={<FaCog />} label="Admin" />
+                <NavLink to="/admin" icon={<FaCog color={hasAdminNotifications ? '#D4A847' : 'white'} />} label="Admin" />
               )}
 
               <Box

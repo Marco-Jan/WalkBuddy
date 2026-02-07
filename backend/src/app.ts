@@ -9,6 +9,11 @@ import blockRoutes from './routes/blocks';
 import adminRoutes from './routes/admin';
 import path from 'path';
 import { authLimiter, messageLimiter, generalLimiter } from './middleware/rateLimiter';
+import { dbPromise } from './db';
+
+// In-Memory Cache: userId -> letzter Update-Zeitpunkt (max alle 60s updaten)
+const lastActiveCache = new Map<string, number>();
+const LAST_ACTIVE_INTERVAL = 60_000; // 60 Sekunden
 
 export function createApp() {
 
@@ -40,6 +45,23 @@ export function createApp() {
 
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
+
+  // lastActiveAt Tracking (max alle 60s pro User)
+  app.use(async (req, _res, next) => {
+    const userId = req.session?.userId;
+    if (userId) {
+      const now = Date.now();
+      const last = lastActiveCache.get(userId) || 0;
+      if (now - last > LAST_ACTIVE_INTERVAL) {
+        lastActiveCache.set(userId, now);
+        try {
+          const db = await dbPromise;
+          await db.run(`UPDATE users SET lastActiveAt = CURRENT_TIMESTAMP WHERE id = ?`, [userId]);
+        } catch { /* ignore */ }
+      }
+    }
+    next();
+  });
 
   app.use(generalLimiter);
   app.use('/auth/login', authLimiter);

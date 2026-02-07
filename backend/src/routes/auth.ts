@@ -76,6 +76,7 @@ router.post('/register', async (req, res) => {
     email,
     password,
     accessible,
+    status,
     need_his_time,
     city,
     area,
@@ -105,7 +106,7 @@ router.post('/register', async (req, res) => {
     await db.run(
       `INSERT INTO users (
         id, name, gender, humanGender, age, breed, city, area, postalCode,
-        dogName, email, password, accessible, need_his_time, visibleToGender,
+        dogName, email, password, accessible, status, need_his_time, visibleToGender,
         publicKey, encryptedPrivateKey, aktiv, neutered, description,
         emailVerified, emailVerificationToken
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -123,6 +124,7 @@ router.post('/register', async (req, res) => {
         email,
         hashedPassword,
         accessible ?? 1,
+        status ?? null,
         need_his_time ? 1 : 0,
         visibleToGender ?? 'all',
         publicKey ?? null,

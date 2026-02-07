@@ -28,6 +28,7 @@
 |---|---|
 | **Nutzerprofile** | Registrierung mit Hunde-Infos, Profilbild-Upload, Geschlecht (m/w/d) & Sichtbarkeitsfilter |
 | **Verfügbarkeitsstatus** | Ein-Klick-Toggle um sich als "verfügbar" zu markieren |
+| **Bidirektionaler Sichtbarkeitsfilter** | "Nur Frauen/Männer/Divers sehen" — wirkt in beide Richtungen: Wer z.B. "Nur Frauen" wählt, sieht nur Frauen und wird nur von Frauen gesehen |
 | **Status-Text** | Persönlicher Status-Text mit chronologischem Feed auf der Startseite |
 | **Städte-Autocomplete** | Stadtsuche via OpenStreetMap-Daten (DE/AT/CH) |
 | **Nutzer durchsuchen** | Verfügbare Hundebesitzer finden, sortiert nach Stadtnähe |
@@ -38,7 +39,8 @@
 | **Passwort zurücksetzen** | "Passwort vergessen"-Flow per E-Mail |
 | **Account löschen** | Eigenen Account mit Passwort-Bestätigung deaktivieren |
 | **Onboarding** | Willkommens-Slides für neue Nutzer |
-| **Admin-Dashboard** | Statistiken, Nutzerverwaltung, Meldungen bearbeiten |
+| **System-Ankündigungen** | Admin erstellt Ankündigungen, die allen Nutzern als Banner angezeigt werden |
+| **Admin-Dashboard** | Statistiken (Online-Count, Meldungen, Kontaktanfragen), Nutzerverwaltung, Meldungen, Log mit Sortierung & Filter, Ankündigungen, User-CSV-Export, Warn-Flags |
 
 ---
 
@@ -105,6 +107,24 @@ Das Backend benötigt eine `.env`-Datei. Siehe `.env.example` für die benötigt
 - Rate Limiting gegen Missbrauch
 - E-Mail-Verifizierung bei Registrierung
 - Soft-Delete statt endgültiger Löschung
+- CSV-Export nur mit Admin-Passwort-Bestätigung (max 1/min)
+- Bidirektionaler Sichtbarkeitsfilter verhindert ungewollte Kontaktaufnahme
+
+---
+
+## Admin-Features
+
+| Feature | Beschreibung |
+|---|---|
+| **Dashboard** | Benutzer-Anzahl, Online-Count (aktiv in letzten 5 Min), offene Meldungen, Kontaktanfragen |
+| **Nutzerverwaltung** | Suche, Profilbild-Anzeige, Deaktivierung, Warn-Flags (automatisch ab 2 offenen Meldungen) |
+| **Meldungen** | Alle Reports mit Reporter/Gemeldeter-Info, als erledigt markieren |
+| **Kontaktanfragen** | Nachrichten lesen, als gelesen markieren, loeschen |
+| **Log** | Chronologische Uebersicht aller Aktivitaeten mit Sortierung (Zeit/Typ) und Filter-Chips (Kontakt/Meldung/Nachricht) |
+| **Ankuendigungen** | System-Ankuendigungen erstellen und loeschen, sichtbar fuer alle Nutzer |
+| **User-Export** | CSV-Download (Name, Email, Stadt, Hundename, Aktiv) mit Passwort-Bestaetigung und Rate-Limit |
+| **Warn-Flags** | Automatische Markierung bei 2+ Meldungen, manuelles Verwarnen/Aufheben durch Admin |
+| **Gear-Icon** | Admin-Icon in der Navigation wird orange bei offenen Meldungen oder ungelesenen Kontaktanfragen |
 
 ---
 

@@ -1,12 +1,38 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Flex, Heading, Input, Spinner, Text} from '@chakra-ui/react';
-import { FaSave, FaPaw } from 'react-icons/fa';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Input,
+  Spinner,
+  Text,
+  Textarea,
+} from "@chakra-ui/react";
+import { FaSave, FaPaw } from "react-icons/fa";
 // @ts-ignore react-icons TS resolution issue
-import { FaCamera } from 'react-icons/fa';
-import { User } from '../types/user';
-import { getMe, updateMe, setMyStatus, getBlockedUsers, unblockUser, uploadProfilePic, getProfilePicUrl, deleteMyAccount, searchCities } from '../api/api';
-
-
+import { FaCamera } from "react-icons/fa";
+import { User } from "../types/user";
+import {
+  getMe,
+  updateMe,
+  setMyStatus,
+  getBlockedUsers,
+  unblockUser,
+  uploadProfilePic,
+  getProfilePicUrl,
+  deleteMyAccount,
+  searchCities,
+  postStatus,
+  deleteMyStatus,
+  getStatusFeed,
+} from "../api/api";
 
 interface Props {
   user: User;
@@ -18,40 +44,56 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
 
-  const [name, setName] = useState(user.name);
-  const [dogName, setDogName] = useState(user.dogName);
-  const [gender, setGender] = useState(user.gender);
-  const [humanGender, setHumanGender] = useState(user.humanGender);
+  const [name, setName] = useState<string>(user.name);
+  const [dogName, setDogName] = useState<string>(user.dogName);
+  const [gender, setGender] = useState<string>(user.gender);
+  const [humanGender, setHumanGender] = useState<string>(user.humanGender);
   const [age, setAge] = useState(user.age);
-  const [breed, setBreed] = useState(user.breed);
-  const [neutered, setNeutered] = useState(user.neutered ?? '');
-  const [description, setDescription] = useState(user.description ?? '');
+  const [breed, setBreed] = useState<string>(user.breed);
+  const [neutered, setNeutered] = useState<string>(user.neutered ?? "");
+  const [description, setDescription] = useState<string>(
+    user.description ?? "",
+  );
   const [accessible, setAccessible] = useState(!!user.accessible);
-  const [needHisTime, setNeedHisTime] = useState(!!user.need_his_time);
+  const [needHisTime, setNeedHisTime] = useState<boolean>(!!user.need_his_time);
+  const [statusText, setStatusText] = useState("");
+  const [postingStatus, setPostingStatus] = useState(false);
+  const [deletingStatus, setDeletingStatus] = useState(false);
 
-  const [city, setCity] = useState(user.city ?? '');
-  const [area, setArea] = useState(user.area ?? '');
+  const [city, setCity] = useState<string>(user.city ?? "");
+  const [area, setArea] = useState<string>(user.area ?? "");
 
-  const [postalCode, setPostalCode] = useState(user.postalCode ?? '');
-  const [citySuggestions, setCitySuggestions] = useState<{ city: string; postcode: string; state: string }[]>([]);
+  const [postalCode, setPostalCode] = useState(user.postalCode ?? "");
+  const [citySuggestions, setCitySuggestions] = useState<
+    { city: string; postcode: string; state: string }[]
+  >([]);
   const [cityLoading, setCityLoading] = useState(false);
   const [cityInputFocused, setCityInputFocused] = useState(false);
   const cityRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const [blockedUsers, setBlockedUsers] = useState<{ blockedUserId: string; name: string; dogName: string; createdAt: string }[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<
+    {
+      blockedUserId: string;
+      name: string;
+      dogName: string;
+      createdAt: string;
+    }[]
+  >([]);
   const [unblocking, setUnblocking] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadingPic, setUploadingPic] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
+  const [deleteError, setDeleteError] = useState("");
 
   const isAvailable = useMemo(() => !!user.available, [user.available]);
-  const [visibleToGender, setVisibleToGender] = useState(user.visibleToGender ?? 'all');
+  const [visibleToGender, setVisibleToGender] = useState(
+    user.visibleToGender ?? "all",
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -67,21 +109,30 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
         setHumanGender(fresh.humanGender);
         setAge(fresh.age);
         setBreed(fresh.breed);
-        setNeutered(fresh.neutered ?? '');
-        setDescription(fresh.description ?? '');
+        setNeutered(fresh.neutered ?? "");
+        setDescription(fresh.description ?? "");
         setAccessible(!!fresh.accessible);
         setNeedHisTime(!!fresh.need_his_time);
 
-        setCity(fresh.city ?? '');
-        setArea(fresh.area ?? '');
-        setPostalCode(fresh.postalCode ?? '');
-        setVisibleToGender(fresh.visibleToGender ?? 'all');
+        setCity(fresh.city ?? "");
+        setArea(fresh.area ?? "");
+        setPostalCode(fresh.postalCode ?? "");
+        setVisibleToGender(fresh.visibleToGender ?? "all");
 
         onUpdate(fresh);
 
         try {
           const blocked = await getBlockedUsers();
           setBlockedUsers(blocked.items);
+        } catch {
+          // ignore
+        }
+
+        // Eigenen Status aus Feed laden
+        try {
+          const feed = await getStatusFeed();
+          const myStatus = feed.items.find((s) => s.userId === fresh.id);
+          if (myStatus) setStatusText(myStatus.text);
         } catch {
           // ignore
         }
@@ -100,7 +151,7 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage('');
+    setMessage("");
     setSavingProfile(true);
 
     try {
@@ -123,17 +174,13 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
 
       const updatedUser: User = res.user;
       onUpdate(updatedUser);
-      setMessage('Profil gespeichert');
+      setMessage("Profil gespeichert");
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Fehler beim Speichern');
+      setMessage(err.response?.data?.error || "Fehler beim Speichern");
     } finally {
       setSavingProfile(false);
     }
   };
-
-
-
-
 
   const handlePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,17 +190,17 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
       await uploadProfilePic(file);
       const fresh = await getMe();
       onUpdate(fresh);
-      setMessage('Profilbild aktualisiert');
+      setMessage("Profilbild aktualisiert");
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Fehler beim Hochladen');
+      setMessage(err.response?.data?.error || "Fehler beim Hochladen");
     } finally {
       setUploadingPic(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const toggleVisibility = async () => {
-    setMessage('');
+    setMessage("");
     setTogglingStatus(true);
 
     try {
@@ -166,9 +213,11 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
         onUpdate(fresh);
       }
 
-      setMessage(!isAvailable ? 'Du bist jetzt sichbar' : 'Du bist jetzt unsichtbar');
+      setMessage(
+        !isAvailable ? "Du bist jetzt sichbar" : "Du bist jetzt unsichtbar",
+      );
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Fehler beim Status ändern');
+      setMessage(err.response?.data?.error || "Fehler beim Status ändern");
     } finally {
       setTogglingStatus(false);
     }
@@ -178,9 +227,11 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
     setUnblocking(blockedUserId);
     try {
       await unblockUser(blockedUserId);
-      setBlockedUsers(prev => prev.filter(b => b.blockedUserId !== blockedUserId));
+      setBlockedUsers((prev) =>
+        prev.filter((b) => b.blockedUserId !== blockedUserId),
+      );
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Fehler beim Entblockieren');
+      setMessage(err.response?.data?.error || "Fehler beim Entblockieren");
     } finally {
       setUnblocking(null);
     }
@@ -189,12 +240,12 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
   const handleDeleteAccount = async () => {
     if (!deletePassword) return;
     setDeletingAccount(true);
-    setDeleteError('');
+    setDeleteError("");
     try {
       await deleteMyAccount(deletePassword);
       if (onAccountDeleted) onAccountDeleted();
     } catch (err: any) {
-      setDeleteError(err.response?.data?.error || 'Fehler beim Löschen');
+      setDeleteError(err.response?.data?.error || "Fehler beim Löschen");
     } finally {
       setDeletingAccount(false);
     }
@@ -236,8 +287,8 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
         setCityInputFocused(false);
       }
     };
-    if (cityInputFocused) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    if (cityInputFocused) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [cityInputFocused]);
 
   if (loading)
@@ -248,10 +299,10 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
     );
 
   const inputProps = {
-    bg: 'sand.100' as const,
-    borderColor: 'sand.400' as const,
-    _hover: { borderColor: 'forest.300' },
-    _focus: { borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' },
+    bg: "sand.100" as const,
+    borderColor: "sand.400" as const,
+    _hover: { borderColor: "forest.300" },
+    _focus: { borderColor: "forest.500", boxShadow: "0 0 0 1px #2D6A4F" },
   };
 
   return (
@@ -263,15 +314,15 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
         gradientTo="forest.700"
         borderRadius="xl"
         borderBottomRadius="0"
-        px={{ base: '4', md: '6' }}
-        py={{ base: '4', md: '5' }}
+        px={{ base: "4", md: "6" }}
+        py={{ base: "4", md: "5" }}
       >
         <Flex align="center" gap="3">
           <input
             type="file"
             accept="image/*"
             ref={fileInputRef}
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
             onChange={handlePicUpload}
           />
           <Box
@@ -284,30 +335,53 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
               <img
                 src={getProfilePicUrl(user.profilePic)!}
                 alt="Profilbild"
-                style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }}
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "2px solid white",
+                }}
               />
             ) : (
               <Flex
-                w="56px" h="56px"
+                w="56px"
+                h="56px"
                 borderRadius="full"
                 bg="forest.600"
                 border="2px solid white"
-                align="center" justify="center"
+                align="center"
+                justify="center"
               >
                 <FaPaw size="24" color="#D4A847" />
               </Flex>
             )}
             <Flex
-              position="absolute" bottom="0" right="0"
-              w="20px" h="20px" borderRadius="full"
-              bg="amber.400" align="center" justify="center"
+              position="absolute"
+              bottom="0"
+              right="0"
+              w="20px"
+              h="20px"
+              borderRadius="full"
+              bg="amber.400"
+              align="center"
+              justify="center"
               border="2px solid white"
             >
               <FaCamera size="9" color="#fff" />
             </Flex>
             {uploadingPic && (
-              <Flex position="absolute" top="0" left="0" w="56px" h="56px"
-                borderRadius="full" bg="blackAlpha.500" align="center" justify="center">
+              <Flex
+                position="absolute"
+                top="0"
+                left="0"
+                w="56px"
+                h="56px"
+                borderRadius="full"
+                bg="blackAlpha.500"
+                align="center"
+                justify="center"
+              >
                 <Spinner size="sm" color="white" />
               </Flex>
             )}
@@ -324,7 +398,13 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
       </Box>
 
       {/* Card Body */}
-      <Box bg="white" borderRadius="xl" borderTopRadius="0" boxShadow="lg" p={{ base: '4', md: '6' }}>
+      <Box
+        bg="white"
+        borderRadius="xl"
+        borderTopRadius="0"
+        boxShadow="lg"
+        p={{ base: "4", md: "6" }}
+      >
         {/* Status Section */}
         <Box mb="6" pb="5" borderBottom="1px solid" borderColor="sand.300">
           <Flex align="center" justify="space-between" wrap="wrap" gap="3">
@@ -337,95 +417,187 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
                   w="3"
                   h="3"
                   borderRadius="full"
-                  bg={isAvailable ? 'forest.500' : 'sand.500'}
+                  bg={isAvailable ? "forest.500" : "sand.500"}
                 />
                 <Text color="bark.400" fontSize="sm">
-                  {isAvailable ? 'Sichtbar' : 'Unsichtbar'}
+                  {isAvailable ? "Sichtbar" : "Unsichtbar"}
                 </Text>
               </Flex>
             </Box>
             <Button
               onClick={toggleVisibility}
               disabled={togglingStatus}
-              bg={isAvailable ? 'bark.400' : 'forest.500'}
+              bg={isAvailable ? "bark.400" : "forest.500"}
               color="white"
-              _hover={{ bg: isAvailable ? 'bark.500' : 'forest.600' }}
+              _hover={{ bg: isAvailable ? "bark.500" : "forest.600" }}
               size="sm"
               fontWeight="700"
             >
-              {isAvailable ? 'Unsichtbar schalten' : 'Sichtbar schalten'}
+              {isAvailable ? "Unsichtbar schalten" : "Sichtbar schalten"}
             </Button>
+          </Flex>
+        </Box>
+
+        {/* Status posten */}
+        <Box mb="6" pb="5" borderBottom="1px solid" borderColor="sand.300">
+          <Text fontWeight="700" color="bark.500" mb="2">
+            Walk-Info für andere
+          </Text>
+          <Textarea
+            value={statusText}
+            onChange={(e) => {
+              if (e.target.value.length <= 150) setStatusText(e.target.value);
+            }}
+            {...inputProps}
+            placeholder="z.B. In 1 Stunde im Park, gemütliche Runde"
+            rows={2}
+            resize="none"
+          />
+          <Flex justify="space-between" align="center" mt="2">
+            <Text fontSize="xs" color="bark.400">
+              {statusText.length}/150
+            </Text>
+            <Flex gap="2">
+              {statusText.trim() && (
+                <Button
+                  onClick={async () => {
+                    setDeletingStatus(true);
+                    setMessage("");
+                    try {
+                      await deleteMyStatus();
+                      setStatusText("");
+                      setMessage("Status gelöscht");
+                    } catch {
+                      setMessage("Fehler beim Löschen");
+                    } finally {
+                      setDeletingStatus(false);
+                    }
+                  }}
+                  disabled={deletingStatus}
+                  variant="outline"
+                  borderColor="ember.400"
+                  color="ember.500"
+                  _hover={{ bg: "ember.50" }}
+                  size="sm"
+                  fontWeight="600"
+                >
+                  {deletingStatus ? "Löscht…" : "Löschen"}
+                </Button>
+              )}
+              <Button
+                onClick={async () => {
+                  if (!statusText.trim()) return;
+                  setPostingStatus(true);
+                  setMessage("");
+                  try {
+                    await postStatus(statusText.trim());
+                    setMessage("Status gepostet");
+                  } catch {
+                    setMessage("Fehler beim Posten");
+                  } finally {
+                    setPostingStatus(false);
+                  }
+                }}
+                disabled={postingStatus || !statusText.trim()}
+                bg="forest.500"
+                color="white"
+                _hover={{ bg: "forest.600" }}
+                size="sm"
+                fontWeight="700"
+              >
+                {postingStatus ? "Postet…" : "Status posten"}
+              </Button>
+            </Flex>
           </Flex>
         </Box>
 
         {/* Profile Form */}
         <form onSubmit={handleSaveProfile}>
-
           {/* Personal Info */}
           <Text fontWeight="700" color="bark.500" mb="3">
             Menschen Profil
           </Text>
 
-          <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="3" mb="3" direction={{ base: "column", sm: "row" }}>
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Name</Text>
-              <Input value={name} onChange={e => setName(e.target.value)} required {...inputProps} />
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Name
+              </Text>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                {...inputProps}
+              />
             </Box>
 
             <Box flex="1">
-            <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Geschlecht<span style={{ fontSize: "12px", marginLeft: "6px" }}>
-              wird nicht angezeigt</span>
-            </Text>
-            <select
-              value={humanGender}
-              onChange={e => setHumanGender(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '6px',
-                border: '1px solid #E2C9A0',
-                backgroundColor: '#FFFCF7',
-                color: '#6B4226',
-                fontWeight: 600,
-                fontFamily: "'Nunito', sans-serif",
-                fontSize: '14px',
-              }}
-            >
-              <option value="male">Mann</option>
-              <option value="female">Frau</option>
-              <option value="divers">Divers</option>
-            </select>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Geschlecht
+                <span style={{ fontSize: "12px", marginLeft: "6px" }}>
+                  wird nicht angezeigt
+                </span>
+              </Text>
+              <select
+                value={humanGender}
+                onChange={(e) => setHumanGender(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid #E2C9A0",
+                  backgroundColor: "#FFFCF7",
+                  color: "#6B4226",
+                  fontWeight: 600,
+                  fontFamily: "'Nunito', sans-serif",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="male">Mann</option>
+                <option value="female">Frau</option>
+                <option value="divers">Divers</option>
+              </select>
             </Box>
           </Flex>
-            {/* personal ende */}
-
+          {/* personal ende */}
 
           {/* Hund section */}
           <Text fontWeight="700" color="bark.500" mb="3">
             Hunde Profil
           </Text>
 
-          <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="3" mb="3" direction={{ base: "column", sm: "row" }}>
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Hundename</Text>
-              <Input value={dogName} onChange={e => setDogName(e.target.value)} required {...inputProps} />
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Hundename
+              </Text>
+              <Input
+                value={dogName}
+                onChange={(e) => setDogName(e.target.value)}
+                required
+                {...inputProps}
+              />
             </Box>
 
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Geschlecht</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Geschlecht
+              </Text>
               <select
                 value={gender}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setGender(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setGender(e.target.value)
+                }
                 style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2C9A0',
-                  backgroundColor: '#FFFCF7',
-                  color: '#6B4226',
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid #E2C9A0",
+                  backgroundColor: "#FFFCF7",
+                  color: "#6B4226",
                   fontWeight: 600,
                   fontFamily: "'Nunito', sans-serif",
-                  fontSize: '14px',
+                  fontSize: "14px",
                 }}
               >
                 <option value="male">Rüde</option>
@@ -434,22 +606,26 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
             </Box>
           </Flex>
 
-          <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="3" mb="3" direction={{ base: "column", sm: "row" }}>
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Alter</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Alter
+              </Text>
               <select
                 value={age}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setAge(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setAge(e.target.value)
+                }
                 style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2C9A0',
-                  backgroundColor: '#FFFCF7',
-                  color: '#6B4226',
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid #E2C9A0",
+                  backgroundColor: "#FFFCF7",
+                  color: "#6B4226",
                   fontWeight: 600,
                   fontFamily: "'Nunito', sans-serif",
-                  fontSize: '14px',
+                  fontSize: "14px",
                 }}
               >
                 <option value="puppy">Welpe</option>
@@ -460,45 +636,56 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
             </Box>
 
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Rasse</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Rasse
+              </Text>
               <Input
                 value={breed}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBreed(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setBreed(e.target.value)
+                }
                 placeholder="Labrador"
                 {...inputProps}
               />
             </Box>
           </Flex>
 
-          <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="3" mb="3" direction={{ base: "column", sm: "row" }}>
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Kastriert</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Kastriert
+              </Text>
               <select
                 value={neutered}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNeutered(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setNeutered(e.target.value)
+                }
                 style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2C9A0',
-                  backgroundColor: '#FFFCF7',
-                  color: '#6B4226',
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid #E2C9A0",
+                  backgroundColor: "#FFFCF7",
+                  color: "#6B4226",
                   fontWeight: 600,
                   fontFamily: "'Nunito', sans-serif",
-                  fontSize: '14px',
+                  fontSize: "14px",
                 }}
               >
-                
                 <option value="neutered">Neutral</option>
                 <option value="intact">Nicht neutral</option>
               </select>
             </Box>
 
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Beschreibung</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Beschreibung
+              </Text>
               <Input
                 value={description}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDescription(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setDescription(e.target.value)
+                }
                 placeholder="Kurze Beschreibung deines Hundes"
                 {...inputProps}
               />
@@ -506,71 +693,82 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
           </Flex>
           {/* Hunde section ende */}
 
-
           {/* Location */}
           <Text fontWeight="700" color="bark.500" mb="3" mt="5">
             Standort
           </Text>
 
-          <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="3" mb="3" direction={{ base: "column", sm: "row" }}>
             <Box flex="1" ref={cityRef} position="relative">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Stadt</Text>
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Stadt
+              </Text>
               <Input
                 value={city}
-                onChange={e => handleCityChange(e.target.value)}
+                onChange={(e) => handleCityChange(e.target.value)}
                 onFocus={() => setCityInputFocused(true)}
                 placeholder="z.B. Graz"
                 autoComplete="off"
                 {...inputProps}
               />
-              {cityInputFocused && (cityLoading || citySuggestions.length > 0) && (
-                <Box
-                  position="absolute"
-                  top="100%"
-                  left="0"
-                  right="0"
-                  bg="white"
-                  border="1px solid"
-                  borderColor="sand.300"
-                  borderRadius="md"
-                  boxShadow="lg"
-                  zIndex="10"
-                  maxH="200px"
-                  overflowY="auto"
-                  mt="1"
-                >
-                  {cityLoading ? (
-                    <Flex justify="center" py="3">
-                      <Spinner size="sm" color="forest.500" />
-                    </Flex>
-                  ) : (
-                    citySuggestions.map((c, i) => (
-                      <Box
-                        key={`${c.city}-${c.postcode}-${i}`}
-                        px="3"
-                        py="2"
-                        cursor="pointer"
-                        fontSize="sm"
-                        fontWeight="600"
-                        color="bark.500"
-                        _hover={{ bg: 'sand.200' }}
-                        onMouseDown={() => {
-                          setCity(c.city);
-                          if (c.postcode) setPostalCode(c.postcode);
-                          setCitySuggestions([]);
-                          setCityInputFocused(false);
-                        }}
-                      >
-                        {c.city}{c.state ? `, ${c.state}` : ''}{c.postcode ? ` (${c.postcode})` : ''}
-                      </Box>
-                    ))
-                  )}
-                </Box>
-              )}
+              {cityInputFocused &&
+                (cityLoading || citySuggestions.length > 0) && (
+                  <Box
+                    position="absolute"
+                    top="100%"
+                    left="0"
+                    right="0"
+                    bg="white"
+                    border="1px solid"
+                    borderColor="sand.300"
+                    borderRadius="md"
+                    boxShadow="lg"
+                    zIndex="10"
+                    maxH="200px"
+                    overflowY="auto"
+                    mt="1"
+                  >
+                    {cityLoading ? (
+                      <Flex justify="center" py="3">
+                        <Spinner size="sm" color="forest.500" />
+                      </Flex>
+                    ) : (
+                      citySuggestions.map((c, i) => (
+                        <Box
+                          key={`${c.city}-${c.postcode}-${i}`}
+                          px="3"
+                          py="2"
+                          cursor="pointer"
+                          fontSize="sm"
+                          fontWeight="600"
+                          color="bark.500"
+                          _hover={{ bg: "sand.200" }}
+                          onMouseDown={() => {
+                            setCity(c.city);
+                            if (c.postcode) setPostalCode(c.postcode);
+                            setCitySuggestions([]);
+                            setCityInputFocused(false);
+                          }}
+                        >
+                          {c.city}
+                          {c.state ? `, ${c.state}` : ""}
+                          {c.postcode ? ` (${c.postcode})` : ""}
+                        </Box>
+                      ))
+                    )}
+                  </Box>
+                )}
             </Box>
             <Box flex="1">
-              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Stadtteil / Bezirk</Text>
-              <Input value={area} onChange={e => setArea(e.target.value)} placeholder="z.B. Lend" {...inputProps} />
+              <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+                Stadtteil / Bezirk
+              </Text>
+              <Input
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                placeholder="z.B. Lend"
+                {...inputProps}
+              />
             </Box>
           </Flex>
 
@@ -580,75 +778,82 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
           </Text>
 
           <Box mb="4">
-            <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Wer darf mich sehen?</Text>
+            <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">
+              Wer darf mich sehen?
+            </Text>
             <select
               value={visibleToGender}
-              onChange={e => setVisibleToGender(e.target.value as any)}
+              onChange={(e) => setVisibleToGender(e.target.value as any)}
               style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '6px',
-                border: '1px solid #E2C9A0',
-                backgroundColor: '#FFFCF7',
-                color: '#6B4226',
+                width: "100%",
+                padding: "8px",
+                borderRadius: "6px",
+                border: "1px solid #E2C9A0",
+                backgroundColor: "#FFFCF7",
+                color: "#6B4226",
                 fontWeight: 600,
                 fontFamily: "'Nunito', sans-serif",
-                fontSize: '14px',
+                fontSize: "14px",
               }}
             >
               <option value="all">Alle</option>
               <option value="female">Nur Frauen</option>
               <option value="male">Nur Männer</option>
+              <option value="divers">Nur Divers</option>
             </select>
           </Box>
 
           {/* Checkboxes */}
           <Flex gap="3" mb="5" wrap="wrap">
-            <label style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '999px',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-              border: '2px solid',
-              borderColor: accessible ? '#2D6A4F' : '#E2C9A0',
-              backgroundColor: accessible ? '#E8F5E9' : '#FFFCF7',
-              color: accessible ? '#2D6A4F' : '#6B4226',
-              transition: 'all 0.2s',
-            }}>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 14px",
+                borderRadius: "999px",
+                fontWeight: 600,
+                fontSize: "14px",
+                cursor: "pointer",
+                border: "2px solid",
+                borderColor: accessible ? "#2D6A4F" : "#E2C9A0",
+                backgroundColor: accessible ? "#E8F5E9" : "#FFFCF7",
+                color: accessible ? "#2D6A4F" : "#6B4226",
+                transition: "all 0.2s",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={accessible}
-                onChange={e => setAccessible(e.target.checked)}
-                style={{ display: 'none' }}
+                onChange={(e) => setAccessible(e.target.checked)}
+                style={{ display: "none" }}
               />
-              {accessible ? '\u2705' : '\u26AA'} Zugänglich
+              {accessible ? "\u2705" : "\u26AA"} Zugänglich
             </label>
-            <label style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '999px',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-              border: '2px solid',
-              borderColor: needHisTime ? '#D4A847' : '#E2C9A0',
-              backgroundColor: needHisTime ? '#FDF8E8' : '#FFFCF7',
-              color: needHisTime ? '#D4A847' : '#6B4226',
-              transition: 'all 0.2s',
-            }}>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 14px",
+                borderRadius: "999px",
+                fontWeight: 600,
+                fontSize: "14px",
+                cursor: "pointer",
+                border: "2px solid",
+                borderColor: needHisTime ? "#D4A847" : "#E2C9A0",
+                backgroundColor: needHisTime ? "#FDF8E8" : "#FFFCF7",
+                color: needHisTime ? "#D4A847" : "#6B4226",
+                transition: "all 0.2s",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={needHisTime}
-                onChange={e => setNeedHisTime(e.target.checked)}
-                style={{ display: 'none' }}
+                onChange={(e) => setNeedHisTime(e.target.checked)}
+                style={{ display: "none" }}
               />
-              {needHisTime ? '\u23F3' : '\u26AA'} Schnupperzeit
+              {needHisTime ? "\u23F3" : "\u26AA"} Schnupperzeit
             </label>
           </Flex>
 
@@ -657,18 +862,23 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
             disabled={savingProfile}
             bg="forest.500"
             color="white"
-            _hover={{ bg: 'forest.600' }}
+            _hover={{ bg: "forest.600" }}
             width="full"
             size="lg"
             fontWeight="700"
           >
-            <FaSave style={{ marginRight: '8px' }} />
-            {savingProfile ? 'Speichert…' : 'Profil speichern'}
+            <FaSave style={{ marginRight: "8px" }} />
+            {savingProfile ? "Speichert…" : "Profil speichern"}
           </Button>
         </form>
 
         {message && (
-          <Text mt="4" textAlign="center" color={message.includes('Fehler') ? 'ember.500' : 'forest.600'} fontWeight="600">
+          <Text
+            mt="4"
+            textAlign="center"
+            color={message.includes("Fehler") ? "ember.500" : "forest.600"}
+            fontWeight="600"
+          >
             {message}
           </Text>
         )}
@@ -679,21 +889,24 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
             <Text fontWeight="700" color="bark.500" mb="3">
               Blockierte Nutzer
             </Text>
-            {blockedUsers.map(b => (
+            {blockedUsers.map((b) => (
               <Flex
                 key={b.blockedUserId}
                 align="center"
                 justify="space-between"
                 bg="sand.100"
                 borderRadius="lg"
-                px="4" py="3" mb="2"
+                px="4"
+                py="3"
+                mb="2"
               >
                 <Box>
                   <Text fontWeight="600" color="bark.500" fontSize="sm">
                     {b.dogName} ({b.name})
                   </Text>
                   <Text fontSize="xs" color="bark.400">
-                    Blockiert am {new Date(b.createdAt).toLocaleDateString('de-DE')}
+                    Blockiert am{" "}
+                    {new Date(b.createdAt).toLocaleDateString("de-DE")}
                   </Text>
                 </Box>
                 <Button
@@ -701,12 +914,12 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
                   variant="outline"
                   borderColor="forest.500"
                   color="forest.500"
-                  _hover={{ bg: 'forest.50' }}
+                  _hover={{ bg: "forest.50" }}
                   fontWeight="600"
                   disabled={unblocking === b.blockedUserId}
                   onClick={() => handleUnblock(b.blockedUserId)}
                 >
-                  {unblocking === b.blockedUserId ? 'Wird…' : 'Entblockieren'}
+                  {unblocking === b.blockedUserId ? "Wird…" : "Entblockieren"}
                 </Button>
               </Flex>
             ))}
@@ -720,30 +933,30 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
               type="button"
               onClick={() => setShowDeleteDialog(true)}
               style={{
-                fontSize: '12px',
-                color: '#A0896C',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
+                fontSize: "12px",
+                color: "#A0896C",
+                cursor: "pointer",
+                background: "none",
+                border: "none",
                 padding: 0,
-                transition: 'color 0.2s',
+                transition: "color 0.2s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#C0392B')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#A0896C')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#C0392B")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#A0896C")}
             >
               Account löschen
             </button>
           ) : (
             <Box bg="sand.100" borderRadius="lg" p="4">
               <Text fontSize="sm" color="bark.500" mb="3">
-                Bist du sicher? Dein Account wird deaktiviert und du kannst dich nicht mehr einloggen.
-                Gib dein Passwort zur Bestätigung ein:
+                Bist du sicher? Dein Account wird deaktiviert und du kannst dich
+                nicht mehr einloggen. Gib dein Passwort zur Bestätigung ein:
               </Text>
               <Input
                 type="password"
                 placeholder="Passwort"
                 value={deletePassword}
-                onChange={e => setDeletePassword(e.target.value)}
+                onChange={(e) => setDeletePassword(e.target.value)}
                 mb="3"
                 {...inputProps}
               />
@@ -758,14 +971,18 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
                   disabled={deletingAccount || !deletePassword}
                   bg="ember.500"
                   color="white"
-                  _hover={{ bg: 'ember.600' }}
+                  _hover={{ bg: "ember.600" }}
                   size="sm"
                   fontWeight="700"
                 >
-                  {deletingAccount ? 'Wird gelöscht…' : 'Endgültig löschen'}
+                  {deletingAccount ? "Wird gelöscht…" : "Endgültig löschen"}
                 </Button>
                 <Button
-                  onClick={() => { setShowDeleteDialog(false); setDeletePassword(''); setDeleteError(''); }}
+                  onClick={() => {
+                    setShowDeleteDialog(false);
+                    setDeletePassword("");
+                    setDeleteError("");
+                  }}
                   variant="outline"
                   borderColor="bark.300"
                   color="bark.400"

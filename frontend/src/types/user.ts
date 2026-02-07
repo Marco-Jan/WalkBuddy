@@ -21,4 +21,5 @@ export interface User {
   role?: 'user' | 'admin';
   aktiv: number;
   hasSeenOnboarding?: number;
+  
 }

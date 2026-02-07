@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Box, Button, Flex, Heading, Spinner, Text, Textarea } from '@chakra-ui/react';
 import { FaArrowLeft, FaPaperPlane } from 'react-icons/fa';
+// @ts-ignore react-icons TS resolution issue
+import { FaCheck, FaCheckDouble } from 'react-icons/fa';
 import { getMe, getMessagesWith, sendMessage, markConversationRead, getPartnerName, getPublicKey, blockUser, reportUser, deleteConversation } from '../api/api';
 import {
   loadPrivateKey,
@@ -36,6 +38,7 @@ const MessagePage: React.FC = () => {
   const [meId, setMeId] = useState<string>('');
   const [otherName, setOtherName] = useState<string>('Chat');
   const [e2eeActive, setE2eeActive] = useState(false);
+  const [partnerLastSeenAt, setPartnerLastSeenAt] = useState<string | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
@@ -144,6 +147,7 @@ const MessagePage: React.FC = () => {
     try {
       const data = await getMessagesWith(userId);
       const rawMessages: Message[] = data.messages;
+      setPartnerLastSeenAt(data.partnerLastSeenAt || null);
 
       // Public Key des Partners importieren (einmalig)
       if (!otherPubKeyRef.current && data.otherPublicKey) {
@@ -552,6 +556,8 @@ const MessagePage: React.FC = () => {
         ) : (
           messages.map(m => {
             const isMine = !!meId && m.senderId === meId;
+            const isRead = isMine && partnerLastSeenAt
+              && new Date(m.createdAt).getTime() <= new Date(partnerLastSeenAt).getTime();
 
             return (
               <Flex
@@ -578,6 +584,15 @@ const MessagePage: React.FC = () => {
                   <Text whiteSpace="pre-wrap" fontSize="sm">
                     {m.content}
                   </Text>
+                  {isMine && (
+                    <Flex justify="flex-end" mt="0.5">
+                      {isRead ? (
+                        <FaCheckDouble size="12" style={{ opacity: 0.8 }} />
+                      ) : (
+                        <FaCheck size="10" style={{ opacity: 0.5 }} />
+                      )}
+                    </Flex>
+                  )}
                 </Box>
               </Flex>
             );

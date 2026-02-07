@@ -24,6 +24,7 @@ export async function setupTestDb() {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       accessible INTEGER NOT NULL DEFAULT 0,
+      status TEXT DEFAULT NULL,
       need_his_time INTEGER NOT NULL DEFAULT 0,
       available INTEGER NOT NULL DEFAULT 0,
       visibleToGender TEXT NOT NULL DEFAULT 'all'
@@ -44,6 +45,14 @@ export async function setupTestDb() {
       otherId TEXT NOT NULL,
       lastSeenAt DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00',
       PRIMARY KEY (userId, otherId)
+    );
+
+    CREATE TABLE IF NOT EXISTS statuses (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      text TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id)
     );
   `);
 

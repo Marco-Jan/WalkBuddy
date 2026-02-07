@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Flex, Heading, Input, Spinner, Text } from '@chakra-ui/react';
-import { FaEnvelope, FaPaw } from 'react-icons/fa';
+import { Box, Button, Flex, Heading, Input, Spinner, Text, Textarea } from '@chakra-ui/react';
+import { FaPaw } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
-import { FaUsers, FaFlag, FaTrash, FaCheck, FaEye, FaInbox } from 'react-icons/fa';
+import { FaUsers, FaFlag, FaTrash, FaCheck, FaEye, FaInbox, FaCircle, FaExclamationTriangle, FaDownload, FaBullhorn, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
 import { User } from '../types/user';
 import {
   getAdminStats, getAdminUsers, getAdminReports, resolveReport, deleteAdminUser,
   getProfilePicUrl, getAdminContact, markContactRead, deleteContact, getAdminLog,
+  getAdminAnnouncements, createAnnouncement, deleteAnnouncement, exportUsersCSV,
+  warnUser, clearUserFlag,
 } from '../api/api';
 
 interface Props {
@@ -16,7 +18,7 @@ interface Props {
 
 type AdminStats = {
   users: number;
-  messages: number;
+  onlineUsers: number;
   openReports: number;
   unreadContact: number;
 };
@@ -30,8 +32,19 @@ type AdminUser = {
   role: string;
   available: number;
   city: string | null;
+  aktiv: number;
   messageCount: number;
   activeReports: number;
+  flagged: boolean;
+  warned: number;
+};
+
+type Announcement = {
+  id: string;
+  title: string;
+  message: string;
+  active: number;
+  createdAt: string;
 };
 
 type AdminReport = {
@@ -68,13 +81,14 @@ type LogEntry = {
 
 const AdminPage: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'reports' | 'contact' | 'log'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'reports' | 'contact' | 'log' | 'announcements'>('overview');
 
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -82,6 +96,26 @@ const AdminPage: React.FC<Props> = ({ user }) => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [resolving, setResolving] = useState<string | null>(null);
   const [expandedContact, setExpandedContact] = useState<string | null>(null);
+
+  // Log sorting/filtering
+  const [logSortBy, setLogSortBy] = useState<'time' | 'type'>('time');
+  const [logSortAsc, setLogSortAsc] = useState(false);
+  const [logTypeFilter, setLogTypeFilter] = useState<Set<string>>(new Set(['contact', 'report', 'message']));
+
+  // Announcements
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+  const [newAnnouncementMessage, setNewAnnouncementMessage] = useState('');
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
+
+  // CSV Export
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportPassword, setExportPassword] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  // Warn flags
+  const [warningUser, setWarningUser] = useState<string | null>(null);
+  const [clearingFlag, setClearingFlag] = useState<string | null>(null);
 
   // Guard: redirect non-admins
   useEffect(() => {
@@ -95,18 +129,20 @@ const AdminPage: React.FC<Props> = ({ user }) => {
     (async () => {
       setLoading(true);
       try {
-        const [s, u, r, c, l] = await Promise.all([
+        const [s, u, r, c, l, a] = await Promise.all([
           getAdminStats(),
           getAdminUsers(),
           getAdminReports(),
           getAdminContact(),
           getAdminLog(),
+          getAdminAnnouncements(),
         ]);
         setStats(s);
         setUsers(u);
         setReports(r);
         setContactMessages(c);
         setLogEntries(l);
+        setAnnouncements(a);
       } catch (e: any) {
         if (e?.response?.status === 403 || e?.response?.status === 401) {
           navigate('/', { replace: true });
@@ -161,6 +197,104 @@ const AdminPage: React.FC<Props> = ({ user }) => {
     } catch {
       // ignore
     }
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncementTitle.trim() || !newAnnouncementMessage.trim()) return;
+    setCreatingAnnouncement(true);
+    try {
+      const a = await createAnnouncement(newAnnouncementTitle.trim(), newAnnouncementMessage.trim());
+      setAnnouncements(prev => [a, ...prev]);
+      setNewAnnouncementTitle('');
+      setNewAnnouncementMessage('');
+    } catch {
+      // ignore
+    } finally {
+      setCreatingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await deleteAnnouncement(id);
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleExport = async () => {
+    if (!exportPassword) return;
+    setExporting(true);
+    setExportError('');
+    try {
+      const blob = await exportUsersCSV(exportPassword);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `walkbuddy-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      setShowExportDialog(false);
+      setExportPassword('');
+    } catch (err: any) {
+      setExportError(err.response?.data?.error || 'Export fehlgeschlagen');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleWarnUser = async (id: string) => {
+    setWarningUser(id);
+    try {
+      await warnUser(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, warned: 1 } : u));
+    } catch {
+      // ignore
+    } finally {
+      setWarningUser(null);
+    }
+  };
+
+  const handleClearFlag = async (id: string) => {
+    setClearingFlag(id);
+    try {
+      await clearUserFlag(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, warned: 0 } : u));
+    } catch {
+      // ignore
+    } finally {
+      setClearingFlag(null);
+    }
+  };
+
+  // Sorted/filtered log entries
+  const sortedLogEntries = useMemo(() => {
+    let filtered = logEntries.filter(e => logTypeFilter.has(e.type));
+    filtered.sort((a, b) => {
+      if (logSortBy === 'type') {
+        const cmp = a.type.localeCompare(b.type);
+        if (cmp !== 0) return logSortAsc ? cmp : -cmp;
+      }
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return logSortAsc ? timeA - timeB : timeB - timeA;
+    });
+    return filtered;
+  }, [logEntries, logSortBy, logSortAsc, logTypeFilter]);
+
+  const toggleLogType = (type: string) => {
+    setLogTypeFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
   };
 
   if (user.role !== 'admin') return null;
@@ -240,55 +374,75 @@ const AdminPage: React.FC<Props> = ({ user }) => {
         <Box {...tabStyle('log')} onClick={() => setActiveTab('log')}>
           Log
         </Box>
+        <Box {...tabStyle('announcements')} onClick={() => setActiveTab('announcements')}>
+          <Flex align="center" gap="1.5">
+            <FaBullhorn size="12" />
+            Info
+          </Flex>
+        </Box>
       </Flex>
 
       {/* Overview Tab */}
       {activeTab === 'overview' && stats && (
-        <Flex gap="4" wrap="wrap">
-          <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
-            <Flex align="center" gap="3" mb="2">
-              <Flex w="40px" h="40px" borderRadius="lg" bg="forest.50" align="center" justify="center">
-                <FaUsers size="18" color="#2D6A4F" />
+        <>
+          <Flex gap="4" wrap="wrap" mb="5">
+            <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
+              <Flex align="center" gap="3" mb="2">
+                <Flex w="40px" h="40px" borderRadius="lg" bg="forest.50" align="center" justify="center">
+                  <FaUsers size="18" color="#2D6A4F" />
+                </Flex>
+                <Text fontSize="sm" color="bark.400" fontWeight="600">Benutzer</Text>
               </Flex>
-              <Text fontSize="sm" color="bark.400" fontWeight="600">Benutzer</Text>
-            </Flex>
-            <Text fontSize="2xl" fontWeight="800" color="bark.500">{stats.users}</Text>
-          </Box>
+              <Text fontSize="2xl" fontWeight="800" color="bark.500">{stats.users}</Text>
+            </Box>
 
-          <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
-            <Flex align="center" gap="3" mb="2">
-              <Flex w="40px" h="40px" borderRadius="lg" bg="amber.50" align="center" justify="center">
-                <FaEnvelope size="18" color="#D4A847" />
+            <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
+              <Flex align="center" gap="3" mb="2">
+                <Flex w="40px" h="40px" borderRadius="lg" bg="forest.50" align="center" justify="center">
+                  <FaCircle size="14" color="#2D6A4F" />
+                </Flex>
+                <Text fontSize="sm" color="bark.400" fontWeight="600">Online</Text>
               </Flex>
-              <Text fontSize="sm" color="bark.400" fontWeight="600">Nachrichten</Text>
-            </Flex>
-            <Text fontSize="2xl" fontWeight="800" color="bark.500">{stats.messages}</Text>
-          </Box>
+              <Text fontSize="2xl" fontWeight="800" color="forest.500">{stats.onlineUsers}</Text>
+            </Box>
 
-          <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
-            <Flex align="center" gap="3" mb="2">
-              <Flex w="40px" h="40px" borderRadius="lg" bg="ember.50" align="center" justify="center">
-                <FaFlag size="18" color="#E85D3A" />
+            <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
+              <Flex align="center" gap="3" mb="2">
+                <Flex w="40px" h="40px" borderRadius="lg" bg="ember.50" align="center" justify="center">
+                  <FaFlag size="18" color="#E85D3A" />
+                </Flex>
+                <Text fontSize="sm" color="bark.400" fontWeight="600">Offene Meldungen</Text>
               </Flex>
-              <Text fontSize="sm" color="bark.400" fontWeight="600">Offene Meldungen</Text>
-            </Flex>
-            <Text fontSize="2xl" fontWeight="800" color={stats.openReports > 0 ? 'ember.500' : 'bark.500'}>
-              {stats.openReports}
-            </Text>
-          </Box>
+              <Text fontSize="2xl" fontWeight="800" color={stats.openReports > 0 ? 'ember.500' : 'bark.500'}>
+                {stats.openReports}
+              </Text>
+            </Box>
 
-          <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
-            <Flex align="center" gap="3" mb="2">
-              <Flex w="40px" h="40px" borderRadius="lg" bg="forest.50" align="center" justify="center">
-                <FaInbox size="18" color="#2D6A4F" />
+            <Box flex="1" minW="140px" bg="white" borderRadius="xl" boxShadow="md" p="5">
+              <Flex align="center" gap="3" mb="2">
+                <Flex w="40px" h="40px" borderRadius="lg" bg="forest.50" align="center" justify="center">
+                  <FaInbox size="18" color="#2D6A4F" />
+                </Flex>
+                <Text fontSize="sm" color="bark.400" fontWeight="600">Kontaktanfragen</Text>
               </Flex>
-              <Text fontSize="sm" color="bark.400" fontWeight="600">Kontaktanfragen</Text>
-            </Flex>
-            <Text fontSize="2xl" fontWeight="800" color={stats.unreadContact > 0 ? 'ember.500' : 'bark.500'}>
-              {stats.unreadContact}
-            </Text>
+              <Text fontSize="2xl" fontWeight="800" color={stats.unreadContact > 0 ? 'ember.500' : 'bark.500'}>
+                {stats.unreadContact}
+              </Text>
+            </Box>
+          </Flex>
+
+          {/* Export Button */}
+          <Box textAlign="center">
+            <Button
+              bg="forest.500" color="white" _hover={{ bg: 'forest.600' }}
+              size="sm" fontWeight="700"
+              onClick={() => setShowExportDialog(true)}
+            >
+              <FaDownload style={{ marginRight: '6px' }} />
+              User-Export (CSV)
+            </Button>
           </Box>
-        </Flex>
+        </>
       )}
 
       {/* Users Tab */}
@@ -314,6 +468,8 @@ const AdminPage: React.FC<Props> = ({ user }) => {
               p="4" mb="2"
               align="center"
               gap="3"
+              borderLeft={u.flagged || u.warned ? '4px solid' : 'none'}
+              borderLeftColor={u.warned ? 'ember.500' : u.flagged ? 'amber.400' : 'transparent'}
             >
               {u.profilePic ? (
                 <img
@@ -333,13 +489,30 @@ const AdminPage: React.FC<Props> = ({ user }) => {
                 </Flex>
               )}
               <Box flex="1" minW="0">
-                <Flex align="center" gap="2">
+                <Flex align="center" gap="2" wrap="wrap">
                   <Text fontWeight="700" color="bark.500" fontSize="sm" lineClamp={1}>
                     {u.dogName} ({u.name})
                   </Text>
                   {u.role === 'admin' && (
                     <Text fontSize="xs" bg="forest.100" color="forest.700" px="2" borderRadius="full" fontWeight="600">
                       Admin
+                    </Text>
+                  )}
+                  {u.flagged && !u.warned && (
+                    <Flex align="center" gap="1" bg="amber.100" px="2" borderRadius="full">
+                      <FaExclamationTriangle size="10" color="#D4A847" />
+                      <Text fontSize="xs" color="amber.700" fontWeight="600">Flagged</Text>
+                    </Flex>
+                  )}
+                  {u.warned === 1 && (
+                    <Flex align="center" gap="1" bg="ember.100" px="2" borderRadius="full">
+                      <FaExclamationTriangle size="10" color="#E85D3A" />
+                      <Text fontSize="xs" color="ember.700" fontWeight="600">Verwarnt</Text>
+                    </Flex>
+                  )}
+                  {u.aktiv === 0 && (
+                    <Text fontSize="xs" bg="sand.200" color="bark.400" px="2" borderRadius="full" fontWeight="600">
+                      Deaktiviert
                     </Text>
                   )}
                 </Flex>
@@ -351,18 +524,43 @@ const AdminPage: React.FC<Props> = ({ user }) => {
                   )}
                 </Flex>
               </Box>
-              {u.role !== 'admin' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  color="ember.500"
-                  _hover={{ bg: 'ember.50' }}
-                  onClick={() => setDeleteConfirm(u.id)}
-                  disabled={deleting === u.id}
-                >
-                  <FaTrash size="14" />
-                </Button>
-              )}
+              <Flex gap="1" flexShrink={0}>
+                {u.role !== 'admin' && (u.flagged || u.warned) && (
+                  u.warned ? (
+                    <Button
+                      size="sm" variant="ghost" color="forest.500"
+                      _hover={{ bg: 'forest.50' }}
+                      onClick={() => handleClearFlag(u.id)}
+                      disabled={clearingFlag === u.id}
+                      title="Flag aufheben"
+                    >
+                      <FaCheck size="14" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm" variant="ghost" color="amber.500"
+                      _hover={{ bg: 'amber.50' }}
+                      onClick={() => handleWarnUser(u.id)}
+                      disabled={warningUser === u.id}
+                      title="Verwarnen"
+                    >
+                      <FaExclamationTriangle size="14" />
+                    </Button>
+                  )
+                )}
+                {u.role !== 'admin' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    color="ember.500"
+                    _hover={{ bg: 'ember.50' }}
+                    onClick={() => setDeleteConfirm(u.id)}
+                    disabled={deleting === u.id}
+                  >
+                    <FaTrash size="14" />
+                  </Button>
+                )}
+              </Flex>
             </Flex>
           ))}
 
@@ -515,10 +713,64 @@ const AdminPage: React.FC<Props> = ({ user }) => {
       {/* Log Tab */}
       {activeTab === 'log' && (
         <Box>
-          {logEntries.length === 0 ? (
+          {/* Sort & Filter Controls */}
+          <Flex gap="2" mb="4" wrap="wrap" align="center">
+            <Button
+              size="sm" fontWeight="600"
+              bg={logSortBy === 'time' ? 'forest.500' : 'sand.200'}
+              color={logSortBy === 'time' ? 'white' : 'bark.500'}
+              _hover={{ bg: logSortBy === 'time' ? 'forest.600' : 'sand.300' }}
+              onClick={() => {
+                if (logSortBy === 'time') setLogSortAsc(!logSortAsc);
+                else { setLogSortBy('time'); setLogSortAsc(false); }
+              }}
+            >
+              {logSortBy === 'time' && (logSortAsc ? <FaSortAmountUp style={{ marginRight: '4px' }} /> : <FaSortAmountDown style={{ marginRight: '4px' }} />)}
+              nach Zeit
+            </Button>
+            <Button
+              size="sm" fontWeight="600"
+              bg={logSortBy === 'type' ? 'forest.500' : 'sand.200'}
+              color={logSortBy === 'type' ? 'white' : 'bark.500'}
+              _hover={{ bg: logSortBy === 'type' ? 'forest.600' : 'sand.300' }}
+              onClick={() => {
+                if (logSortBy === 'type') setLogSortAsc(!logSortAsc);
+                else { setLogSortBy('type'); setLogSortAsc(true); }
+              }}
+            >
+              {logSortBy === 'type' && (logSortAsc ? <FaSortAmountUp style={{ marginRight: '4px' }} /> : <FaSortAmountDown style={{ marginRight: '4px' }} />)}
+              nach Typ
+            </Button>
+            <Box w="1px" h="24px" bg="sand.300" mx="1" />
+            {['contact', 'report', 'message'].map(type => {
+              const badge = logTypeLabel(type);
+              const active = logTypeFilter.has(type);
+              return (
+                <Box
+                  key={type}
+                  as="button"
+                  px="3" py="1"
+                  borderRadius="full"
+                  fontSize="xs" fontWeight="700"
+                  bg={active ? badge.bg : 'sand.100'}
+                  color={active ? badge.color : 'bark.400'}
+                  border="2px solid"
+                  borderColor={active ? badge.color : 'sand.300'}
+                  cursor="pointer"
+                  opacity={active ? 1 : 0.5}
+                  onClick={() => toggleLogType(type)}
+                  transition="all 0.2s"
+                >
+                  {badge.label}
+                </Box>
+              );
+            })}
+          </Flex>
+
+          {sortedLogEntries.length === 0 ? (
             <Text textAlign="center" color="bark.400" py="8">Keine Log-Einträge vorhanden.</Text>
           ) : (
-            logEntries.map((entry, i) => {
+            sortedLogEntries.map((entry, i) => {
               const badge = logTypeLabel(entry.type);
               return (
                 <Flex
@@ -557,6 +809,68 @@ const AdminPage: React.FC<Props> = ({ user }) => {
         </Box>
       )}
 
+      {/* Announcements Tab */}
+      {activeTab === 'announcements' && (
+        <Box>
+          {/* Create Announcement */}
+          <Box bg="white" borderRadius="xl" boxShadow="md" p="5" mb="5">
+            <Text fontWeight="700" color="bark.500" mb="3">Neue Ankündigung</Text>
+            <Input
+              placeholder="Titel"
+              value={newAnnouncementTitle}
+              onChange={e => setNewAnnouncementTitle(e.target.value)}
+              mb="2"
+              bg="sand.100" borderColor="sand.400"
+              _hover={{ borderColor: 'forest.300' }}
+              _focus={{ borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' }}
+            />
+            <Textarea
+              placeholder="Nachricht"
+              value={newAnnouncementMessage}
+              onChange={e => setNewAnnouncementMessage(e.target.value)}
+              mb="3" rows={3} resize="none"
+              bg="sand.100" borderColor="sand.400"
+              _hover={{ borderColor: 'forest.300' }}
+              _focus={{ borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' }}
+            />
+            <Button
+              bg="forest.500" color="white" _hover={{ bg: 'forest.600' }}
+              size="sm" fontWeight="700"
+              onClick={handleCreateAnnouncement}
+              disabled={creatingAnnouncement || !newAnnouncementTitle.trim() || !newAnnouncementMessage.trim()}
+            >
+              {creatingAnnouncement ? 'Erstellt…' : 'Ankündigung erstellen'}
+            </Button>
+          </Box>
+
+          {/* Existing Announcements */}
+          {announcements.length === 0 ? (
+            <Text textAlign="center" color="bark.400" py="8">Keine Ankündigungen vorhanden.</Text>
+          ) : (
+            announcements.map(a => (
+              <Box key={a.id} bg="white" borderRadius="lg" boxShadow="sm" p="4" mb="2">
+                <Flex justify="space-between" align="flex-start" gap="3">
+                  <Box flex="1" minW="0">
+                    <Text fontWeight="700" color="bark.500" fontSize="sm">{a.title}</Text>
+                    <Text fontSize="sm" color="bark.400" mt="1" whiteSpace="pre-wrap">{a.message}</Text>
+                    <Text fontSize="xs" color="bark.400" mt="2">
+                      {new Date(a.createdAt).toLocaleString('de-DE')}
+                    </Text>
+                  </Box>
+                  <Button
+                    size="sm" variant="ghost" color="ember.500"
+                    _hover={{ bg: 'ember.50' }}
+                    onClick={() => handleDeleteAnnouncement(a.id)}
+                  >
+                    <FaTrash size="14" />
+                  </Button>
+                </Flex>
+              </Box>
+            ))
+          )}
+        </Box>
+      )}
+
       {/* Delete Confirm Dialog */}
       {deleteConfirm && (
         <Box
@@ -584,6 +898,52 @@ const AdminPage: React.FC<Props> = ({ user }) => {
                 disabled={deleting === deleteConfirm}
               >
                 {deleting === deleteConfirm ? 'Wird gelöscht…' : 'Löschen'}
+              </Button>
+            </Flex>
+          </Box>
+        </Box>
+      )}
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <Box
+          position="fixed" top="0" left="0" right="0" bottom="0"
+          bg="blackAlpha.500" zIndex="50"
+          display="flex" alignItems="center" justifyContent="center"
+          onClick={() => { setShowExportDialog(false); setExportPassword(''); setExportError(''); }}
+        >
+          <Box
+            bg="white" borderRadius="xl" p="6" maxW="400px" w="90%" boxShadow="xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <Heading size="md" color="bark.500" mb="3">User-Export</Heading>
+            <Text color="bark.400" fontSize="sm" mb="3">
+              Gib dein Admin-Passwort ein, um den User-Export als CSV herunterzuladen.
+            </Text>
+            <Input
+              type="password"
+              placeholder="Admin-Passwort"
+              value={exportPassword}
+              onChange={e => setExportPassword(e.target.value)}
+              mb="3"
+              bg="sand.100" borderColor="sand.400"
+              _hover={{ borderColor: 'forest.300' }}
+              _focus={{ borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' }}
+            />
+            {exportError && (
+              <Text fontSize="sm" color="ember.500" mb="2" fontWeight="600">{exportError}</Text>
+            )}
+            <Flex gap="3" justify="flex-end">
+              <Button variant="ghost" size="sm" color="bark.400" onClick={() => { setShowExportDialog(false); setExportPassword(''); setExportError(''); }}>
+                Abbrechen
+              </Button>
+              <Button
+                size="sm" bg="forest.500" color="white"
+                _hover={{ bg: 'forest.600' }}
+                onClick={handleExport}
+                disabled={exporting || !exportPassword}
+              >
+                {exporting ? 'Exportiert…' : 'Herunterladen'}
               </Button>
             </Flex>
           </Box>

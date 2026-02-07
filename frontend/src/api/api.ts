@@ -35,7 +35,7 @@ export const sendMessage = async (receiverId: string, content: string, iv?: stri
   return res.data;
 };
 
-export const getMessagesWith = async (userId: string): Promise<{ messages: any[]; otherPublicKey: string | null }> => {
+export const getMessagesWith = async (userId: string): Promise<{ messages: any[]; otherPublicKey: string | null; partnerLastSeenAt: string | null }> => {
   const res = await axios.get(`${BASE_URL}/messages/with/${userId}`);
   return res.data;
 };
@@ -121,12 +121,30 @@ export const updateMe = async (
     city?: string | null;
     area?: string | null;
     postalCode?: string | null;
-    visibleToGender?: 'all' | 'male' | 'female';
+    visibleToGender?: 'all' | 'male' | 'female' | 'divers';
     neutered?: string | null;
     description?: string | null;
   }
 ) => {
   const res = await axios.put(`${BASE_URL}/auth/me`, user);
+  return res.data;
+};
+
+// Status posten/aktualisieren
+export const postStatus = async (text: string) => {
+  const res = await axios.post(`${BASE_URL}/status/post`, { text });
+  return res.data;
+};
+
+// Status-Feed laden (neueste 5)
+export const getStatusFeed = async (): Promise<{ items: { id: string; text: string; createdAt: string; userId: string; name: string; dogName: string; profilePic: string | null; city: string | null }[] }> => {
+  const res = await axios.get(`${BASE_URL}/status/feed`);
+  return res.data;
+};
+
+// Eigenen Status löschen
+export const deleteMyStatus = async () => {
+  const res = await axios.delete(`${BASE_URL}/status/my-status`);
   return res.data;
 };
 
@@ -243,5 +261,46 @@ export const forgotPassword = async (email: string) => {
 // Passwort zurücksetzen
 export const resetPassword = async (token: string, password: string) => {
   const res = await axios.post(`${BASE_URL}/auth/reset-password`, { token, password });
+  return res.data;
+};
+
+// Admin: Ankündigungen
+export const getAdminAnnouncements = async () => {
+  const res = await axios.get(`${BASE_URL}/admin/announcements`);
+  return res.data.items;
+};
+
+export const createAnnouncement = async (title: string, message: string) => {
+  const res = await axios.post(`${BASE_URL}/admin/announcements`, { title, message });
+  return res.data;
+};
+
+export const deleteAnnouncement = async (id: string) => {
+  const res = await axios.delete(`${BASE_URL}/admin/announcements/${id}`);
+  return res.data;
+};
+
+// Aktive Ankündigungen (für alle User)
+export const getActiveAnnouncements = async (): Promise<{ id: string; title: string; message: string; createdAt: string }[]> => {
+  const res = await axios.get(`${BASE_URL}/status/announcements/active`);
+  return res.data.items;
+};
+
+// Admin: User-Export als CSV
+export const exportUsersCSV = async (password: string): Promise<Blob> => {
+  const res = await axios.post(`${BASE_URL}/admin/export`, { password }, {
+    responseType: 'blob',
+  });
+  return res.data;
+};
+
+// Admin: Warn-Flags
+export const warnUser = async (id: string) => {
+  const res = await axios.put(`${BASE_URL}/admin/users/${id}/warn`);
+  return res.data;
+};
+
+export const clearUserFlag = async (id: string) => {
+  const res = await axios.put(`${BASE_URL}/admin/users/${id}/clear-flag`);
   return res.data;
 };
