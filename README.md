@@ -16,7 +16,7 @@
 
 ---
 
-**WalkBuddy** ist eine Plattform, auf der Hundebesitzer andere Hundebesitzer in ihrer Umgebung finden können, um gemeinsam Gassi zu gehen. Nachrichten zwischen Nutzern sind Ende-zu-Ende-verschlüsselt.
+**WalkBuddy** ist eine Plattform, auf der Hundebesitzer andere Hundebesitzer in ihrer Umgebung finden können, um gemeinsam Gassi zu gehen. Alle Nachrichten zwischen Nutzern sind Ende-zu-Ende-verschlüsselt.
 
 </div>
 
@@ -29,10 +29,10 @@
 - [Projektstruktur](#projektstruktur)
 - [Lokale Entwicklung](#lokale-entwicklung)
 - [Tests](#tests)
-- [Produktion / Deployment](#produktion--deployment)
 - [Umgebungsvariablen](#umgebungsvariablen)
 - [API-Endpunkte](#api-endpunkte)
 - [Datenbank](#datenbank)
+- [Sicherheit](#sicherheit)
 
 ---
 
@@ -40,13 +40,20 @@
 
 | Feature | Beschreibung |
 |---|---|
-| **Nutzerprofile** | Registrierung mit Hunde-Infos (Rasse, kastriert, Beschreibung), Profilbild-Upload, Geschlecht & Sichtbarkeitsfilter |
+| **Nutzerprofile** | Registrierung mit Hunde-Infos (Rasse, kastriert, Beschreibung), Profilbild-Upload, Geschlecht (m/w/d) & Sichtbarkeitsfilter |
 | **Verfügbarkeitsstatus** | Ein-Klick-Toggle um sich als "verfügbar" zu markieren |
-| **Nutzer durchsuchen** | Verfügbare Hundebesitzer in der Umgebung finden, gefiltert nach Geschlecht und Blockierungen |
+| **Status-Text** | Persönlicher Status-Text (max. 150 Zeichen), chronologischer Status-Feed auf der Startseite |
+| **Nutzer durchsuchen** | Verfügbare Hundebesitzer finden, gefiltert nach Geschlecht und Blockierungen |
 | **E2E-verschlüsselte Nachrichten** | ECDH P-256 Schlüsseltausch + AES-256-GCM, Schlüssel lokal in IndexedDB |
 | **Posteingang** | Konversationsliste mit letzter Nachricht und Ungelesen-Indikator |
+| **Chat löschen** | Einzelne Konversationen per Nutzer löschen (Soft-Delete, Partner sieht weiterhin alles) |
 | **Blockieren & Melden** | Nutzer blockieren/entblocken, Nutzer mit Begründung melden |
 | **Öffentliche Profile** | Profilseite anderer Nutzer einsehen |
+| **E-Mail-Verifizierung** | Registrierung erfordert E-Mail-Bestätigung per Link, erneutes Senden möglich |
+| **Passwort zurücksetzen** | "Passwort vergessen"-Flow mit E-Mail-Token (1 Stunde gültig) |
+| **Account löschen** | Eigenen Account mit Passwort-Bestätigung deaktivieren (Soft-Delete) |
+| **Onboarding** | 3-stufiges Willkommens-Modal nach erster Anmeldung |
+| **Rate Limiting** | Schutz gegen Missbrauch: Auth (10/15min), Nachrichten (30/min), Allgemein (100/min) |
 | **Admin-Dashboard** | Statistiken, Nutzerverwaltung, Meldungen bearbeiten (3 Tabs) |
 | **Session-Auth** | Sichere Session-basierte Authentifizierung mit SQLite Session-Store |
 
@@ -65,6 +72,8 @@
 | `express-session` + `connect-sqlite3` | Session-Management |
 | `bcrypt` | Passwort-Hashing |
 | `multer` | Datei-Upload (Profilbilder) |
+| `nodemailer` | E-Mail-Versand (Verifizierung, Passwort-Reset) |
+| `express-rate-limit` | Rate Limiting |
 
 ### Frontend
 
@@ -100,10 +109,12 @@ WalkBuddy/
 │   ├── src/
 │   │   ├── routes/
 │   │   │   ├── admin.ts        # Admin-Dashboard & Verwaltung
-│   │   │   ├── auth.ts         # Registrierung, Login, Profilbild
+│   │   │   ├── auth.ts         # Registrierung, Login, E-Mail, Passwort-Reset
 │   │   │   ├── blocks.ts       # Blockieren & Melden
-│   │   │   ├── messages.ts     # Nachrichten-CRUD & Posteingang
+│   │   │   ├── messages.ts     # Nachrichten-CRUD, Posteingang, Chat löschen
 │   │   │   └── status.ts       # Verfügbarkeit & Nutzerliste
+│   │   ├── middleware/
+│   │   │   └── rateLimiter.ts  # Rate Limiting Konfiguration
 │   │   ├── __tests__/          # Jest-Tests
 │   │   ├── app.ts              # Express App-Factory
 │   │   ├── db.ts               # DB-Schema & Migrationen
@@ -112,22 +123,29 @@ WalkBuddy/
 │   └── package.json
 ├── frontend/
 │   ├── public/
+│   │   ├── favicon.svg         # SVG-Favicon (Hundepfote)
+│   │   ├── manifest.json       # PWA-Manifest
+│   │   └── robots.txt          # Crawler-Konfiguration
 │   ├── src/
 │   │   ├── api/
 │   │   │   └── api.ts          # Zentraler Axios-Client
 │   │   ├── components/
-│   │   │   ├── AccountCard.tsx  # Profil bearbeiten & Einstellungen
+│   │   │   ├── AccountCard.tsx  # Profil bearbeiten, Status, Account löschen
 │   │   │   ├── Header.tsx       # Navigation & Status-Toggle
-│   │   │   ├── LoginForm.tsx    # Login
-│   │   │   ├── RegisterForm.tsx # Registrierung
+│   │   │   ├── LoginForm.tsx    # Login + Verifizierungs-Banner
+│   │   │   ├── RegisterForm.tsx # Registrierung + E-Mail-Hinweis
+│   │   │   ├── OnboardingModal.tsx # Willkommens-Slides
+│   │   │   ├── StatusFeed.tsx   # Status-Feed aller Nutzer
 │   │   │   ├── ProtectedRoute.tsx
 │   │   │   ├── UserCard.tsx     # Nutzerkarte
 │   │   │   └── UserList.tsx     # Verfügbare Nutzer
 │   │   ├── pages/
 │   │   │   ├── AdminPage.tsx    # Admin (Statistiken, Nutzer, Meldungen)
 │   │   │   ├── InboxPage.tsx    # Posteingang
-│   │   │   ├── MessagePage.tsx  # 1:1 Chat
-│   │   │   └── UserProfilePage.tsx
+│   │   │   ├── MessagePage.tsx  # 1:1 Chat mit Kebab-Menü
+│   │   │   ├── UserProfilePage.tsx
+│   │   │   ├── ForgotPasswordPage.tsx
+│   │   │   └── ResetPasswordPage.tsx
 │   │   ├── crypto.ts           # E2EE-Implementierung
 │   │   ├── theme.ts            # Chakra UI Farbschema
 │   │   └── App.tsx             # Router & Layout
@@ -193,162 +211,21 @@ npm test
 
 ---
 
-## Produktion / Deployment
-
-### Was wird benötigt
-
-| Komponente | Beschreibung |
-|---|---|
-| **Server / VPS** | Linux-Server (z.B. Ubuntu 22.04+) mit Root-Zugang |
-| **Node.js** | Version 18+ auf dem Server installiert |
-| **Reverse Proxy** | Nginx oder Caddy als Reverse Proxy & HTTPS-Termination |
-| **Domain** | Eine Domain mit DNS-A-Record auf die Server-IP |
-| **SSL-Zertifikat** | Let's Encrypt via Certbot (kostenlos) oder anderer Anbieter |
-| **PM2** | Process Manager zum dauerhaften Betrieb des Backends |
-| **Firewall** | UFW oder iptables, nur Ports 80/443 offen |
-
-### Schritt-für-Schritt
-
-#### 1. Server vorbereiten
-
-```bash
-# Node.js installieren (Ubuntu/Debian)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
-sudo apt install -y nodejs
-
-# PM2 global installieren
-sudo npm install -g pm2
-
-# Nginx installieren
-sudo apt install -y nginx
-
-# Certbot für SSL
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-#### 2. Projekt auf den Server bringen
-
-```bash
-# Code auf den Server klonen/kopieren
-git clone <repo-url> /opt/walkbuddy
-cd /opt/walkbuddy
-
-# Abhängigkeiten installieren
-cd backend && npm install --production
-cd ../frontend && npm install
-```
-
-#### 3. Frontend bauen
-
-```bash
-cd /opt/walkbuddy/frontend
-
-# API-URL anpassen: In src/api/api.ts die baseURL auf die eigene Domain ändern
-# z.B. https://walkbuddy.example.com/api
-
-npm run build
-```
-
-Der Build-Output liegt dann in `frontend/build/` und wird von Nginx als statische Dateien ausgeliefert.
-
-#### 4. Umgebungsvariablen setzen
-
-```bash
-# Datei /opt/walkbuddy/backend/.env erstellen (oder als Systemvariablen setzen)
-export SESSION_SECRET="$(openssl rand -hex 64)"
-export NODE_ENV="production"
-```
-
-> **Wichtig:** Das `SESSION_SECRET` muss bei jedem Serverneustart gleich sein, sonst werden alle Sessions ungültig. Am besten einmal generieren und fest speichern.
-
-#### 5. Backend mit PM2 starten
-
-```bash
-cd /opt/walkbuddy/backend
-pm2 start npm --name "walkbuddy-api" -- run start
-pm2 save
-pm2 startup  # Autostart bei Server-Reboot
-```
-
-#### 6. Nginx konfigurieren
-
-```nginx
-server {
-    listen 80;
-    server_name walkbuddy.example.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name walkbuddy.example.com;
-
-    ssl_certificate     /etc/letsencrypt/live/walkbuddy.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/walkbuddy.example.com/privkey.pem;
-
-    # Frontend (React Build)
-    location / {
-        root /opt/walkbuddy/frontend/build;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Backend API
-    location /api/ {
-        proxy_pass http://127.0.0.1:3000/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Profilbild-Uploads
-    location /uploads/ {
-        proxy_pass http://127.0.0.1:3000/uploads/;
-    }
-
-    client_max_body_size 5M;
-}
-```
-
-```bash
-# Nginx testen & neuladen
-sudo nginx -t
-sudo systemctl reload nginx
-
-# SSL-Zertifikat holen
-sudo certbot --nginx -d walkbuddy.example.com
-```
-
-#### 7. Firewall konfigurieren
-
-```bash
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP (Redirect)
-sudo ufw allow 443/tcp   # HTTPS
-sudo ufw enable
-```
-
-### Checkliste vor Go-Live
-
-- [ ] `SESSION_SECRET` als feste Umgebungsvariable gesetzt
-- [ ] Frontend `baseURL` auf Produktions-Domain geändert
-- [ ] `secure: true` in der Session-Cookie-Config (index.ts) aktiviert
-- [ ] CORS-Origin auf die Produktions-Domain umgestellt
-- [ ] SSL-Zertifikat installiert und auto-renewal aktiv (`certbot renew --dry-run`)
-- [ ] `backend/data/` Verzeichnis mit korrekten Schreibrechten
-- [ ] PM2 Autostart konfiguriert (`pm2 startup`)
-- [ ] Firewall aktiv, nur Ports 22/80/443 offen
-- [ ] Regelmässige Backups der SQLite-Datenbank (`buddywalk.db`)
-
----
-
 ## Umgebungsvariablen
+
+### Backend (`backend/.env`)
 
 | Variable | Pflicht | Beschreibung | Standard |
 |---|---|---|---|
 | `SESSION_SECRET` | **Ja** (Produktion) | Geheimnis für Session-Signierung | Wird generiert (nicht persistent!) |
 | `NODE_ENV` | Empfohlen | `production` oder `development` | `development` |
+| `SMTP_HOST` | Ja | SMTP-Server für E-Mail-Versand | - |
+| `SMTP_PORT` | Ja | SMTP-Port | `587` |
+| `SMTP_USER` | Ja | SMTP-Benutzername | - |
+| `SMTP_PASS` | Ja | SMTP-Passwort | - |
+| `SMTP_FROM` | Ja | Absender-Adresse | - |
+| `APP_URL` | Ja | Frontend-URL (für Links in E-Mails) | - |
+| `BACKEND_URL` | Ja | Backend-URL (für Verifizierungs-Links) | - |
 
 ---
 
@@ -358,14 +235,19 @@ sudo ufw enable
 
 | Methode | Pfad | Beschreibung |
 |---|---|---|
-| `POST` | `/register` | Neuen Nutzer registrieren |
-| `POST` | `/login` | Einloggen |
+| `POST` | `/register` | Neuen Nutzer registrieren (sendet Verifizierungs-Mail) |
+| `POST` | `/login` | Einloggen (erfordert verifizierte E-Mail) |
 | `POST` | `/logout` | Session beenden |
 | `GET` | `/me` | Aktuellen Nutzer abrufen |
-| `PUT` | `/me` | Profil aktualisieren |
+| `PUT` | `/me` | Profil aktualisieren (inkl. Status-Text, Onboarding) |
+| `DELETE` | `/me` | Account deaktivieren (Passwort erforderlich) |
 | `POST` | `/upload-pic` | Profilbild hochladen (max 5 MB) |
 | `POST` | `/keys` | E2EE-Schlüsselpaar speichern |
 | `GET` | `/public-key/:userId` | Öffentlichen Schlüssel abrufen |
+| `GET` | `/verify-email` | E-Mail-Adresse verifizieren (Token per Query) |
+| `POST` | `/resend-verification` | Verifizierungs-Mail erneut senden |
+| `POST` | `/forgot-password` | Passwort-Reset-Mail anfordern |
+| `POST` | `/reset-password` | Neues Passwort setzen (Token + neues Passwort) |
 
 ### Status (`/status`)
 
@@ -384,6 +266,7 @@ sudo ufw enable
 | `GET` | `/inbox` | Posteingang (Konversationen) |
 | `GET` | `/unread-count` | Anzahl ungelesener Konversationen |
 | `POST` | `/mark-read/:otherId` | Konversation als gelesen markieren |
+| `DELETE` | `/conversation/:otherId` | Konversation löschen (nur für eigenen Account) |
 
 ### Blockieren (`/blocks`)
 
@@ -410,15 +293,23 @@ sudo ufw enable
 
 Die SQLite-Datenbank wird beim ersten Start automatisch erstellt. Schema-Migrationen laufen automatisch in `db.ts`.
 
-**Tabellen:** `users`, `messages`, `conversation_reads`, `blocks`, `reports`
+**Tabellen:** `users`, `messages`, `conversation_reads`, `blocks`, `reports`, `deleted_conversations`
 
 **Speicherort:** `backend/data/buddywalk.db`
 
-**Backup-Empfehlung:** Tägliches Kopieren der `.db`-Datei, z.B. via Cronjob:
+---
 
-```bash
-0 3 * * * cp /opt/walkbuddy/backend/data/buddywalk.db /backups/walkbuddy/buddywalk_$(date +\%Y\%m\%d).db
-```
+## Sicherheit
+
+| Massnahme | Details |
+|---|---|
+| **Ende-zu-Ende-Verschlüsselung** | ECDH P-256 + AES-256-GCM, private Schlüssel verlassen nie das Gerät |
+| **Passwort-Hashing** | bcrypt mit automatischem Salt |
+| **Session-Sicherheit** | HTTP-only Cookies, Secure-Flag in Produktion |
+| **Rate Limiting** | Auth: 10 Req/15min, Nachrichten: 30 Req/min, Allgemein: 100 Req/min |
+| **E-Mail-Verifizierung** | Account-Aktivierung nur nach E-Mail-Bestätigung |
+| **Soft-Delete** | Accounts und Nachrichten werden deaktiviert, nicht gelöscht |
+| **Input-Validierung** | Eingaben werden serverseitig geprüft |
 
 ---
 

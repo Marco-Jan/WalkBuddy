@@ -1,20 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="32x32" type="image/x-icon" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#2D6A4F" />
-    <meta name="description" content="WalkBuddy - Finde Gassi-Partner in deiner Nähe" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="WalkBuddy - Finde Gassi-Partner und Hundefreunde in deiner Nähe. Vernetze dich mit anderen Hundebesitzern, verabrede dich zum Gassi gehen und tausche dich aus." />
+    <meta name="keywords" content="Gassi gehen, Hundefreunde, Gassi-Partner, Hund, Spaziergang, Hundebesitzer, Dog Walking, Hundetreff, WalkBuddy" />
+    <meta name="author" content="WalkBuddy" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="WalkBuddy - Finde Gassi-Partner in deiner Nähe" />
+    <meta property="og:description" content="Vernetze dich mit Hundebesitzern in deiner Umgebung. Finde Gassi-Partner, verabrede dich zum Spaziergang und tausche dich mit der Hunde-Community aus." />
+    <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta property="og:site_name" content="WalkBuddy" />
+    <meta property="og:locale" content="de_DE" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WalkBuddy - Finde Gassi-Partner in deiner Nähe" />
+    <meta name="twitter:description" content="Vernetze dich mit Hundebesitzern in deiner Umgebung. Finde Gassi-Partner und tausche dich mit der Hunde-Community aus." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/logo512.png" />
+
+    <!-- PWA -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <title>WalkBuddy</title>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "WalkBuddy",
+      "description": "Finde Gassi-Partner und Hundefreunde in deiner Nähe. Vernetze dich mit anderen Hundebesitzern.",
+      "applicationCategory": "SocialNetworkingApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "de",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      }
+    }
+    </script>
+
+    <title>WalkBuddy - Finde Gassi-Partner und Hundefreunde in deiner Nähe</title>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>Du benötigst JavaScript, um WalkBuddy zu nutzen.</noscript>
     <div id="root"></div>
   </body>
 </html>

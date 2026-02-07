@@ -50,7 +50,7 @@ const UserCard: React.FC<Props> = ({ user }) => {
 
   const location =
     user.city
-      ? `${user.city}${user.area ? ` – ${user.area}` : ''}${user.postalCode ? ` ${user.postalCode}` : ''}`
+      ? `${user.city}${user.area ? ` – ${user.area}` : ''}`
       : null;
 
   return (

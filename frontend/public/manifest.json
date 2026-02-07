@@ -1,7 +1,14 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "WalkBuddy",
+  "name": "WalkBuddy - Finde Gassi-Partner in deiner Nähe",
+  "description": "Vernetze dich mit Hundebesitzern in deiner Umgebung. Finde Gassi-Partner, verabrede dich zum Spaziergang und tausche dich aus.",
   "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
@@ -20,6 +27,8 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#2D6A4F",
+  "background_color": "#FAF3E0",
+  "lang": "de",
+  "categories": ["social", "lifestyle"]
 }

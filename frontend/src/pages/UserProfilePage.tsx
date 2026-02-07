@@ -119,7 +119,7 @@ const UserProfilePage: React.FC = () => {
   const available = !!profile.available;
   const location =
     profile.city
-      ? `${profile.city}${profile.area ? ` – ${profile.area}` : ''}${profile.postalCode ? ` ${profile.postalCode}` : ''}`
+      ? `${profile.city}${profile.area ? ` – ${profile.area}` : ''}`
       : null;
 
   return (
