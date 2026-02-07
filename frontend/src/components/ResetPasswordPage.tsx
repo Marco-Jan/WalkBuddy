@@ -18,8 +18,12 @@ const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein.');
+    if (password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein.');
+      return;
+    }
+    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^a-zA-Z0-9]/.test(password)) {
+      setError('Passwort braucht Groß-/Kleinbuchstabe, Zahl & Sonderzeichen.');
       return;
     }
 
@@ -103,6 +107,9 @@ const ResetPasswordPage: React.FC = () => {
               _focus={{ borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' }}
               size="lg"
             />
+            <Text fontSize="xs" color="bark.400" mt="1">
+              Min. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl & Sonderzeichen
+            </Text>
           </Box>
           <Box mb="5">
             <Input

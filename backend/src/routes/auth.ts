@@ -8,6 +8,15 @@ import path from 'path';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
 
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return 'Passwort muss mindestens 8 Zeichen lang sein.';
+  if (!/[a-z]/.test(pw)) return 'Passwort muss mindestens einen Kleinbuchstaben enthalten.';
+  if (!/[A-Z]/.test(pw)) return 'Passwort muss mindestens einen Großbuchstaben enthalten.';
+  if (!/[0-9]/.test(pw)) return 'Passwort muss mindestens eine Zahl enthalten.';
+  if (!/[^a-zA-Z0-9]/.test(pw)) return 'Passwort muss mindestens ein Sonderzeichen enthalten.';
+  return null;
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
@@ -83,6 +92,9 @@ router.post('/register', async (req, res) => {
   if (!name || !age || !humanGender || !dogName || !email || !password) {
     return res.status(400).json({ error: 'Alle Felder sind Pflicht' });
   }
+
+  const pwError = validatePassword(password);
+  if (pwError) return res.status(400).json({ error: pwError });
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -325,6 +337,9 @@ router.post('/reset-password', async (req, res) => {
     if (!token || !password) {
       return res.status(400).json({ error: 'Token und Passwort sind erforderlich' });
     }
+
+    const pwError = validatePassword(password);
+    if (pwError) return res.status(400).json({ error: pwError });
 
     const db = await dbPromise;
     const user = await db.get(

@@ -99,6 +99,7 @@ Das Backend benötigt eine `.env`-Datei. Siehe `.env.example` für die benötigt
 ## Sicherheit
 
 - Ende-zu-Ende-verschlüsselte Nachrichten
+- Passwort-Richtlinie: min. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl & Sonderzeichen
 - Passwörter werden gehasht gespeichert
 - Session-basierte Authentifizierung mit sicheren Cookies
 - Rate Limiting gegen Missbrauch

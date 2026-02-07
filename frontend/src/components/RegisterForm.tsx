@@ -253,6 +253,9 @@ const RegisterForm: React.FC = () => {
               _hover={{ borderColor: 'forest.300' }}
               _focus={{ borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' }}
             />
+            <Text fontSize="xs" color="bark.400" mt="1">
+              Min. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl & Sonderzeichen
+            </Text>
           </Box>
 
           <Flex gap="3" mb="5" wrap="wrap">
