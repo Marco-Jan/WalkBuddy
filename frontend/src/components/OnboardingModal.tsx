@@ -28,7 +28,7 @@ const slides = [
   {
     icon: <FaComments size="40" color="#2D6A4F" />,
     title: 'Nachrichten & Chats',
-    text: 'Schreib anderen Hundebesitzern direkt.',
+    text: 'Schreib anderen Hundebesitzern direkt. Deine Nachrichten sind Ende-zu-Ende-verschlüsselt — niemand außer dir und deinem Gesprächspartner kann sie lesen.',
   },
   {
     icon: <FaMobileAlt size="40" color="#2D6A4F" />,
