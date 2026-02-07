@@ -181,7 +181,7 @@ const RegisterForm: React.FC = () => {
 
           <Box mb="3">
             <Input
-              placeholder="Alter des Hundes (z.B. 3)"
+              placeholder="Alter des Hundes (z.B. 3 Jahre/Monate)"
               value={age}
               onChange={e => setAge(e.target.value)}
               required
