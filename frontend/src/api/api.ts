@@ -8,6 +8,16 @@ const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 export const getApiUrl = () => BASE_URL;
 
 
+export const getCities = async (): Promise<{ city: string; postalCode: string }[]> => {
+  const res = await axios.get(`${BASE_URL}/status/cities`);
+  return res.data;
+};
+
+export const searchCities = async (q: string): Promise<{ city: string; postcode: string; state: string }[]> => {
+  const res = await axios.get(`${BASE_URL}/status/city-search`, { params: { q } });
+  return res.data;
+};
+
 export const getAvailableUsers = async (): Promise<User[]> => {
   const res = await axios.get(`${BASE_URL}/status/available`);
   return res.data;

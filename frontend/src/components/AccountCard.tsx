@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Flex, Heading, Input, Spinner, Text} from '@chakra-ui/react';
 import { FaSave, FaPaw } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
 import { FaCamera } from 'react-icons/fa';
 import { User } from '../types/user';
-import { getMe, updateMe, setMyStatus, getBlockedUsers, unblockUser, uploadProfilePic, getProfilePicUrl, deleteMyAccount } from '../api/api';
+import { getMe, updateMe, setMyStatus, getBlockedUsers, unblockUser, uploadProfilePic, getProfilePicUrl, deleteMyAccount, searchCities } from '../api/api';
 
 
 
@@ -33,7 +33,13 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
 
   const [city, setCity] = useState(user.city ?? '');
   const [area, setArea] = useState(user.area ?? '');
+
   const [postalCode, setPostalCode] = useState(user.postalCode ?? '');
+  const [citySuggestions, setCitySuggestions] = useState<{ city: string; postcode: string; state: string }[]>([]);
+  const [cityLoading, setCityLoading] = useState(false);
+  const [cityInputFocused, setCityInputFocused] = useState(false);
+  const cityRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const [blockedUsers, setBlockedUsers] = useState<{ blockedUserId: string; name: string; dogName: string; createdAt: string }[]>([]);
   const [unblocking, setUnblocking] = useState<string | null>(null);
@@ -194,6 +200,46 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
     }
   };
 
+  const handleCityChange = useCallback((value: string) => {
+    setCity(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length < 2) {
+      setCitySuggestions([]);
+      setCityLoading(false);
+      return;
+    }
+
+    setCityLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await searchCities(value.trim());
+        setCitySuggestions(results);
+      } catch {
+        setCitySuggestions([]);
+      } finally {
+        setCityLoading(false);
+      }
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // Close city dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (cityRef.current && !cityRef.current.contains(e.target as Node)) {
+        setCityInputFocused(false);
+      }
+    };
+    if (cityInputFocused) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [cityInputFocused]);
+
   if (loading)
     return (
       <Flex justify="center" py="16">
@@ -207,7 +253,6 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
     _hover: { borderColor: 'forest.300' },
     _focus: { borderColor: 'forest.500', boxShadow: '0 0 0 1px #2D6A4F' },
   };
-
 
   return (
     <Box maxW="600px" mx="auto">
@@ -468,20 +513,66 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
           </Text>
 
           <Flex gap="3" mb="3" direction={{ base: 'column', sm: 'row' }}>
-            <Box flex="1">
+            <Box flex="1" ref={cityRef} position="relative">
               <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Stadt</Text>
-              <Input value={city} onChange={e => setCity(e.target.value)} placeholder="z.B. Graz" {...inputProps} />
+              <Input
+                value={city}
+                onChange={e => handleCityChange(e.target.value)}
+                onFocus={() => setCityInputFocused(true)}
+                placeholder="z.B. Graz"
+                autoComplete="off"
+                {...inputProps}
+              />
+              {cityInputFocused && (cityLoading || citySuggestions.length > 0) && (
+                <Box
+                  position="absolute"
+                  top="100%"
+                  left="0"
+                  right="0"
+                  bg="white"
+                  border="1px solid"
+                  borderColor="sand.300"
+                  borderRadius="md"
+                  boxShadow="lg"
+                  zIndex="10"
+                  maxH="200px"
+                  overflowY="auto"
+                  mt="1"
+                >
+                  {cityLoading ? (
+                    <Flex justify="center" py="3">
+                      <Spinner size="sm" color="forest.500" />
+                    </Flex>
+                  ) : (
+                    citySuggestions.map((c, i) => (
+                      <Box
+                        key={`${c.city}-${c.postcode}-${i}`}
+                        px="3"
+                        py="2"
+                        cursor="pointer"
+                        fontSize="sm"
+                        fontWeight="600"
+                        color="bark.500"
+                        _hover={{ bg: 'sand.200' }}
+                        onMouseDown={() => {
+                          setCity(c.city);
+                          if (c.postcode) setPostalCode(c.postcode);
+                          setCitySuggestions([]);
+                          setCityInputFocused(false);
+                        }}
+                      >
+                        {c.city}{c.state ? `, ${c.state}` : ''}{c.postcode ? ` (${c.postcode})` : ''}
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              )}
             </Box>
             <Box flex="1">
               <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">Stadtteil / Bezirk</Text>
               <Input value={area} onChange={e => setArea(e.target.value)} placeholder="z.B. Lend" {...inputProps} />
             </Box>
           </Flex>
-
-          <Box mb="3">
-            <Text fontSize="sm" fontWeight="600" color="bark.400" mb="1">PLZ (optional)</Text>
-            <Input value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="z.B. 8020" {...inputProps} />
-          </Box>
 
           {/* Visibility */}
           <Text fontWeight="700" color="bark.500" mb="3" mt="5">
@@ -623,21 +714,25 @@ const AccountCard: React.FC<Props> = ({ user, onUpdate, onAccountDeleted }) => {
         )}
 
         {/* Account löschen */}
-        <Box mt="6" pt="5" borderTop="1px solid" borderColor="sand.300">
-          <Text fontWeight="700" color="ember.500" mb="3">
-            Account löschen
-          </Text>
+        <Box mt="6" textAlign="center">
           {!showDeleteDialog ? (
-            <Button
+            <button
+              type="button"
               onClick={() => setShowDeleteDialog(true)}
-              bg="ember.500"
-              color="white"
-              _hover={{ bg: 'ember.600' }}
-              size="sm"
-              fontWeight="700"
+              style={{
+                fontSize: '12px',
+                color: '#A0896C',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#C0392B')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#A0896C')}
             >
               Account löschen
-            </Button>
+            </button>
           ) : (
             <Box bg="sand.100" borderRadius="lg" p="4">
               <Text fontSize="sm" color="bark.500" mb="3">

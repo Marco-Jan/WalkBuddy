@@ -62,7 +62,12 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 
 app.use(generalLimiter);
-app.use('/auth', authLimiter, authRoutes);
+app.use('/auth/login', authLimiter);
+app.use('/auth/register', authLimiter);
+app.use('/auth/forgot-password', authLimiter);
+app.use('/auth/reset-password', authLimiter);
+app.use('/auth/resend-verification', authLimiter);
+app.use('/auth', authRoutes);
 app.use('/status', statusRoutes);
 app.use('/messages', messageLimiter, messageRoutes);
 app.use('/blocks', blockRoutes);

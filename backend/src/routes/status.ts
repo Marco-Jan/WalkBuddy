@@ -119,4 +119,101 @@ router.post('/set', async (req, res) => {
     });
 
 
+// In-Memory Cache für Photon API
+const cityCache = new Map<string, { data: any[]; ts: number }>();
+const CACHE_TTL = 60_000; // 60s
+const CACHE_MAX = 500;
+
+router.get('/city-search', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const q = (req.query.q as string || '').trim();
+    if (q.length < 2) return res.json([]);
+
+    const cacheKey = q.toLowerCase();
+
+    // Check cache
+    const cached = cityCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=7&layer=city`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeout);
+
+      const json = await response.json();
+      const features: any[] = json.features || [];
+
+      const seen = new Set<string>();
+      const results: { city: string; postcode: string; state: string }[] = [];
+
+      for (const f of features) {
+        const p = f.properties || {};
+        const city = p.name || p.city || '';
+        const postcode = p.postcode || '';
+        const state = p.state || '';
+        const countrycode = (p.countrycode || '').toUpperCase();
+
+        if (!city || (countrycode && countrycode !== 'DE' && countrycode !== 'AT' && countrycode !== 'CH')) continue;
+
+        const key = `${city}-${postcode}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        results.push({ city, postcode, state });
+      }
+
+      // Update cache (evict oldest if full)
+      if (cityCache.size >= CACHE_MAX) {
+        const oldest = cityCache.keys().next().value;
+        if (oldest !== undefined) cityCache.delete(oldest);
+      }
+      cityCache.set(cacheKey, { data: results, ts: Date.now() });
+
+      return res.json(results);
+    } catch (apiErr) {
+      // Fallback: LIKE-Suche auf bestehende DB-Städte
+      const db = await dbPromise;
+      const rows = await db.all(
+        `SELECT DISTINCT city, postalCode FROM users
+         WHERE aktiv = 1 AND city IS NOT NULL AND city != '' AND city LIKE ?
+         ORDER BY city ASC LIMIT 10`,
+        [`%${q}%`]
+      );
+      return res.json(rows.map((r: any) => ({ city: r.city, postcode: r.postalCode || '', state: '' })));
+    }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Alle distinkten Stadt/PLZ-Kombinationen aktiver User
+router.get('/cities', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const db = await dbPromise;
+    const rows = await db.all(
+      `SELECT DISTINCT city, postalCode FROM users
+       WHERE aktiv = 1 AND city IS NOT NULL AND city != ''
+       ORDER BY city ASC`
+    );
+    res.json(rows.map((r: any) => ({ city: r.city, postalCode: r.postalCode || '' })));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
 export default router;

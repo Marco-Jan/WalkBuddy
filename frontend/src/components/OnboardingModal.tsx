@@ -5,6 +5,10 @@ import { FaMapMarkerAlt } from 'react-icons/fa';
 import { FaEye } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
 import { FaComments } from 'react-icons/fa';
+// @ts-ignore react-icons TS resolution issue
+import { FaMobileAlt } from 'react-icons/fa';
+// @ts-ignore react-icons TS resolution issue
+import { FaBell } from 'react-icons/fa';
 
 interface Props {
   onComplete: () => void;
@@ -24,7 +28,17 @@ const slides = [
   {
     icon: <FaComments size="40" color="#2D6A4F" />,
     title: 'Nachrichten & Chats',
-    text: 'Schreib anderen Hundebesitzern direkt. Blockieren & Melden jederzeit möglich.',
+    text: 'Schreib anderen Hundebesitzern direkt.',
+  },
+  {
+    icon: <FaMobileAlt size="40" color="#2D6A4F" />,
+    title: 'Wie eine App nutzen',
+    text: 'Tippe im Browser auf „Teilen" und dann „Zum Startbildschirm". So hast du WalkBuddy wie eine echte App auf deinem Handy.',
+  },
+  {
+    icon: <FaBell size="40" color="#2D6A4F" />,
+    title: 'Keine Nachricht verpassen',
+    text: '  Neue Nachrichten erkennst du am orangenen Hund-Symbol im Menü — schau regelmäßig rein, damit du nichts verpasst!',
   },
 ];
 
