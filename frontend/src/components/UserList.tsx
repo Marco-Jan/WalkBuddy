@@ -4,12 +4,36 @@ import { Box, Flex, Heading, SimpleGrid, Spinner, Text } from '@chakra-ui/react'
 import { FaPaw } from 'react-icons/fa';
 // @ts-ignore react-icons TS resolution issue
 import { FaMapMarkerAlt } from 'react-icons/fa';
-import { getAvailableUsers, searchCities } from '../api/api';
+import { getAvailableUsers, searchCities, getStatusFeed, getProfilePicUrl, getActiveAnnouncements } from '../api/api';
 import { User } from '../types/user';
 import UserCard from './UserCard';
 
 interface Props {
   user?: User;
+}
+
+interface StatusFeedItem {
+  id: string;
+  text: string;
+  createdAt: string;
+  userId: string;
+  name: string;
+  dogName: string;
+  profilePic: string | null;
+  city: string | null;
+}
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.max(0, now - then);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'gerade eben';
+  if (mins < 60) return `vor ${mins} Min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `vor ${hours} Std`;
+  const days = Math.floor(hours / 24);
+  return `vor ${days} Tag${days > 1 ? 'en' : ''}`;
 }
 
 const UserList: React.FC<Props> = ({user}) => {
@@ -23,6 +47,8 @@ const UserList: React.FC<Props> = ({user}) => {
   const [citySearchFocused, setCitySearchFocused] = useState(false);
   const citySearchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [feedItems, setFeedItems] = useState<StatusFeedItem[]>([]);
+  const [announcements, setAnnouncements] = useState<{ id: string; title: string; message: string; createdAt: string }[]>([]);
 
   const navigate = useNavigate();
 
@@ -32,9 +58,15 @@ const UserList: React.FC<Props> = ({user}) => {
     const fetchData = async () => {
       setError('');
       try {
-        const data = await getAvailableUsers();
+        const [data, feed, ann] = await Promise.all([
+          getAvailableUsers(),
+          getStatusFeed().catch(() => ({ items: [] })),
+          getActiveAnnouncements().catch(() => []),
+        ]);
         if (!mounted) return;
         setUsers(data);
+        setFeedItems(feed.items);
+        setAnnouncements(ann);
       } catch (e: any) {
         if (e.response?.status === 401) {
           setUsers([]);
@@ -131,6 +163,91 @@ const UserList: React.FC<Props> = ({user}) => {
         </Heading>
 
       </Flex>
+
+      {/* Ankündigungen */}
+      {announcements.length > 0 && (
+        <Box mb={{ base: '3', md: '4' }}>
+          {announcements.map(a => (
+            <Box
+              key={a.id}
+              bg="amber.50"
+              border="1px solid"
+              borderColor="amber.300"
+              borderRadius="lg"
+              px="4" py="3" mb="2"
+            >
+              <Text fontWeight="700" color="amber.700" fontSize="sm">{a.title}</Text>
+              <Text color="bark.500" fontSize="sm" mt="1">{a.message}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* StatusFeed */}
+      {feedItems.length > 0 && (
+        <Box
+          mb={{ base: '3', md: '4' }}
+          bg="white"
+          borderRadius="lg"
+          boxShadow="sm"
+          px={{ base: '2', md: '3' }}
+          py="2"
+        >
+          <Text fontWeight="700" color="bark.500" mb="1.5" fontSize="xs" textTransform="uppercase" letterSpacing="wide">
+            Walk-Infos
+          </Text>
+          <Flex direction="column" gap="1" maxH="130px" overflowY="auto">
+            {feedItems.map((item) => (
+              <Flex
+                key={item.id}
+                align="center"
+                gap="2"
+                borderRadius="md"
+                px="2"
+                py="1"
+                cursor="pointer"
+                _hover={{ bg: 'sand.100' }}
+                onClick={() => navigate(`/profile/${item.userId}`)}
+              >
+                {item.profilePic ? (
+                  <img
+                    src={getProfilePicUrl(item.profilePic)!}
+                    alt={item.name}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <Flex
+                    w="28px"
+                    h="28px"
+                    borderRadius="full"
+                    bg="forest.100"
+                    align="center"
+                    justify="center"
+                    flexShrink={0}
+                  >
+                    <FaPaw size="10" color="#2D6A4F" />
+                  </Flex>
+                )}
+                <Text fontWeight="700" color="bark.500" fontSize="xs" flexShrink={0}>
+                  {item.name}
+                </Text>
+                <Text color="bark.500" fontSize="xs" flex="1" minW="0" lineClamp={1}>
+                  {item.text}
+                </Text>
+                <Text color="bark.300" fontSize="2xs" flexShrink={0} whiteSpace="nowrap">
+                  {timeAgo(item.createdAt)}
+                </Text>
+              </Flex>
+            ))}
+          </Flex>
+        </Box>
+      )}
 
       <Box mb={{ base: '3', md: '4' }} ref={citySearchRef} position="relative" maxW="280px">
         <Flex align="center" position="relative">
@@ -255,7 +372,7 @@ const UserList: React.FC<Props> = ({user}) => {
           </Text>
         </Flex>
       ) : (
-        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={{ base: '4', md: '5' }}>
+        <SimpleGrid columns={{ base: 2, sm: 3, lg: 4 }} gap={{ base: '2', md: '3' }}>
           {filteredUsers.map(u => (
             <UserCard key={u.id} user={u} />
           ))}

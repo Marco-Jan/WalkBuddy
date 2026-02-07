@@ -72,34 +72,34 @@ const UserCard: React.FC<Props> = ({ user }) => {
         bgGradient="to-r"
         gradientFrom="forest.500"
         gradientTo="forest.700"
-        px={{ base: '4', md: '5' }}
-        py={{ base: '3', md: '4' }}
+        px="3"
+        py="2.5"
         flexShrink={0}
       >
-        <Flex align="center" gap="3">
+        <Flex align="center" gap="2">
           {user.profilePic ? (
             <img
               src={getProfilePicUrl(user.profilePic)!}
               alt={user.dogName}
-              style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', flexShrink: 0 }}
+              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', flexShrink: 0 }}
             />
           ) : (
             <Flex
-              w="40px" h="40px"
+              w="32px" h="32px"
               borderRadius="full"
               bg="forest.600"
               border="2px solid white"
               align="center" justify="center"
               flexShrink={0}
             >
-              <FaPaw size="16" color="#D4A847" />
+              <FaPaw size="13" color="#D4A847" />
             </Flex>
           )}
           <Box>
-            <Heading as="h3" size="md" color="white" fontWeight="800" lineClamp={1}>
+            <Heading as="h3" size="sm" color="white" fontWeight="800" lineClamp={1}>
               {user.dogName} ({user.name})
             </Heading>
-            <Text fontSize="sm" color="forest.100" mt="1">
+            <Text fontSize="xs" color="forest.100">
               {formatDogGender(user.gender)} | {formatAge(user.age)} | {user.breed}
             </Text>
           </Box>
@@ -108,27 +108,27 @@ const UserCard: React.FC<Props> = ({ user }) => {
 
       {/* Body */}
       <Flex
-        px={{ base: '4', md: '5' }}
-        py={{ base: '3', md: '4' }}
+        px="3"
+        py="2.5"
         direction="column"
         flex="1"
       >
-        {/* 1) Badges – eigener Block */}
-        <Box mb="3">
-          <Flex gap="2" wrap="wrap">
+        {/* 1) Badges */}
+        <Box mb="2">
+          <Flex gap="1.5" wrap="wrap">
             {accessible && (
               <Flex
                 align="center"
-                gap="1.5"
+                gap="1"
                 bg="forest.50"
                 color="forest.700"
-                px="3"
-                py="1"
+                px="2"
+                py="0.5"
                 borderRadius="full"
-                fontSize="sm"
+                fontSize="xs"
                 fontWeight="600"
               >
-                <FaShieldAlt size="12" />
+                <FaShieldAlt size="10" />
                 <span>Zugänglich</span>
               </Flex>
             )}
@@ -136,53 +136,53 @@ const UserCard: React.FC<Props> = ({ user }) => {
             {needHisTime && (
               <Flex
                 align="center"
-                gap="1.5"
+                gap="1"
                 bg="amber.50"
                 color="amber.700"
-                px="3"
-                py="1"
+                px="2"
+                py="0.5"
                 borderRadius="full"
-                fontSize="sm"
+                fontSize="xs"
                 fontWeight="600"
               >
-                <FaClock size="12" />
-                <span>Braucht Schnupperzeit</span>
+                <FaClock size="10" />
+                <span>Schnupperzeit</span>
               </Flex>
             )}
 
             {available && (
               <Flex
                 align="center"
-                gap="1.5"
+                gap="1"
                 bg="forest.50"
                 color="forest.600"
-                px="3"
-                py="1"
+                px="2"
+                py="0.5"
                 borderRadius="full"
-                fontSize="sm"
+                fontSize="xs"
                 fontWeight="600"
               >
-                <FaCircle size="8" color="#2D6A4F" />
+                <FaCircle size="6" color="#2D6A4F" />
                 <span>Verfügbar</span>
               </Flex>
             )}
           </Flex>
         </Box>
 
-        {/* 2) Spacer: sorgt dafür, dass Ort + Button immer unten sitzen */}
+        {/* 2) Spacer */}
         <Box flex="1" />
 
-        {/* 3) Ort – eigener Block, direkt über Button */}
-        <Box mb="3" minH="22px">
+        {/* 3) Ort */}
+        <Box mb="2" minH="18px">
           {location && (
-            <Flex align="center" gap="1.5" color="bark.400" fontSize="sm">
-              <FaMapMarkerAlt size="14" />
+            <Flex align="center" gap="1" color="bark.400" fontSize="xs">
+              <FaMapMarkerAlt size="11" />
               <Text lineClamp={1}>{location}</Text>
             </Flex>
           )}
         </Box>
 
-        {/* 4) Button – immer unten */}
+        {/* 4) Button */}
         <Button
           onClick={(e) => { e.stopPropagation(); navigate(`/messages/${user.id}`); }}
           bg="ember.500"
@@ -190,10 +190,11 @@ const UserCard: React.FC<Props> = ({ user }) => {
           _hover={{ bg: 'ember.600' }}
           width="full"
           fontWeight="700"
-          size="sm"
+          size="xs"
+          fontSize="xs"
         >
-          <FaEnvelope style={{ marginRight: '8px' }} />
-          Nachricht schreiben
+          <FaEnvelope style={{ marginRight: '6px' }} />
+          Nachricht
         </Button>
       </Flex>
     </Flex>

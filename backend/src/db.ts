@@ -102,6 +102,14 @@ export async function initDb() {
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS statuses (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      text TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    );
+
   `);
 
   // Migration: age-Spalte hinzufügen falls sie fehlt
@@ -230,6 +238,37 @@ export async function initDb() {
     await db.exec(`ALTER TABLE users ADD COLUMN hasSeenOnboarding INTEGER DEFAULT 0`);
     console.log('✅ Migration: hasSeenOnboarding-Spalte zu users hinzugefügt');
   }
+
+   // Migration: hasSeenOnboarding-Spalte für users
+  const statusCols = await db.all(`PRAGMA table_info(users)`);
+  if (!statusCols.some((c: any) => c.name === 'status')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN status INTEGER DEFAULT NULL`);
+    console.log('✅ Migration: Status-Spalte zu users hinzugefügt');
+  }
+
+  // Migration: lastActiveAt-Spalte für users (Online-Tracking)
+  const lastActiveCols = await db.all(`PRAGMA table_info(users)`);
+  if (!lastActiveCols.some((c: any) => c.name === 'lastActiveAt')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN lastActiveAt DATETIME DEFAULT NULL`);
+    console.log('✅ Migration: lastActiveAt-Spalte zu users hinzugefügt');
+  }
+
+  // Migration: warned-Spalte für users (Admin Warn-Flags)
+  if (!lastActiveCols.some((c: any) => c.name === 'warned')) {
+    await db.exec(`ALTER TABLE users ADD COLUMN warned INTEGER DEFAULT 0`);
+    console.log('✅ Migration: warned-Spalte zu users hinzugefügt');
+  }
+
+  // Announcements-Tabelle
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      active INTEGER DEFAULT 1,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
   console.log('✅ SQLite DB bereit:', dbPath);
 }

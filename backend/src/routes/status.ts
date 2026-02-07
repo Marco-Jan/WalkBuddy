@@ -1,7 +1,16 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { dbPromise } from '../db';
 
 const router = Router();
+
+// Cleanup: Statuse älter als 3 Stunden alle 10 Minuten löschen
+setInterval(async () => {
+  try {
+    const db = await dbPromise;
+    await db.run(`DELETE FROM statuses WHERE datetime(createdAt) <= datetime('now', '-3 hours')`);
+  } catch { /* ignore */ }
+}, 3 * 60 * 60 * 1000);
 
 const SAFE_SELECT = `
   SELECT id, name, email, gender, humanGender, age, breed, neutered, description,
@@ -34,22 +43,25 @@ router.get('/available', async (req, res) => {
 
     const db = await dbPromise;
 
-    // Mein Geschlecht holen
-    const me = await db.get(`SELECT humanGender FROM users WHERE id = ? AND aktiv = 1`, [myId]);
+    // Mein Geschlecht und Sichtbarkeitsfilter holen
+    const me = await db.get(`SELECT humanGender, visibleToGender FROM users WHERE id = ? AND aktiv = 1`, [myId]);
     if (!me) return res.status(401).json({ error: 'Nicht eingeloggt' });
 
-    const myGender = me.humanGender; // 'male' | 'female'
+    const myGender = me.humanGender; // 'male' | 'female' | 'divers'
+    const myFilter = me.visibleToGender; // 'all' | 'male' | 'female' | 'divers'
 
-    // Nur User die mich sehen wollen (oder alle), blockierte ausfiltern
+    // Bidirektional: Zeige nur User deren visibleToGender mein Geschlecht erlaubt
+    // UND deren humanGender mein visibleToGender erlaubt
     const users = await db.all(
       `${SAFE_SELECT}
        WHERE available = 1
          AND id != ?
          AND aktiv = 1
          AND (visibleToGender = 'all' OR visibleToGender = ?)
+         AND (? = 'all' OR humanGender = ?)
          AND id NOT IN (SELECT blockedUserId FROM blocks WHERE userId = ?)
          AND id NOT IN (SELECT userId FROM blocks WHERE blockedUserId = ?)`,
-      [myId, myGender, myId, myId]
+      [myId, myGender, myFilter, myFilter, myId, myId]
     );
 
     res.json(users);
@@ -210,6 +222,100 @@ router.get('/cities', async (req, res) => {
        ORDER BY city ASC`
     );
     res.json(rows.map((r: any) => ({ city: r.city, postalCode: r.postalCode || '' })));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Status posten/aktualisieren (1 Status pro User)
+router.post('/post', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const { text } = req.body;
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ error: 'Status-Text ist erforderlich' });
+    }
+    if (text.length > 150) {
+      return res.status(400).json({ error: 'Status darf max. 150 Zeichen lang sein' });
+    }
+
+    const db = await dbPromise;
+
+    // Alten Status löschen, dann neuen einfügen
+    await db.run(`DELETE FROM statuses WHERE userId = ?`, [userId]);
+    const id = uuidv4();
+    await db.run(
+      `INSERT INTO statuses (id, userId, text) VALUES (?, ?, ?)`,
+      [id, userId, text.trim()]
+    );
+
+    res.json({ success: true, status: { id, userId, text: text.trim() } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Neueste 5 Statuse aller sichtbaren User (Feed)
+router.get('/feed', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const db = await dbPromise;
+
+    const items = await db.all(
+      `SELECT s.id, s.text, s.createdAt, s.userId,
+              u.name, u.dogName, u.profilePic, u.city
+       FROM statuses s
+       JOIN users u ON s.userId = u.id
+       WHERE u.aktiv = 1 AND u.available = 1
+         AND datetime(s.createdAt) > datetime('now', '-3 hours')
+         AND s.userId NOT IN (SELECT blockedUserId FROM blocks WHERE userId = ?)
+         AND s.userId NOT IN (SELECT userId FROM blocks WHERE blockedUserId = ?)
+       ORDER BY s.createdAt DESC
+       LIMIT 5`,
+      [userId, userId]
+    );
+
+    res.json({ items });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Eigenen Status löschen
+router.delete('/my-status', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const db = await dbPromise;
+    await db.run(`DELETE FROM statuses WHERE userId = ?`, [userId]);
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
+// Aktive Ankündigungen (für alle eingeloggten User)
+router.get('/announcements/active', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: 'Nicht eingeloggt' });
+
+    const db = await dbPromise;
+    const items = await db.all(
+      `SELECT id, title, message, createdAt FROM announcements WHERE active = 1 ORDER BY createdAt DESC`
+    );
+
+    res.json({ items });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Serverfehler' });
